@@ -4,6 +4,7 @@
   * semantic segmentation
   * sequence-to-sequence learning
   * diffeomorphic registration
+
   with the following features:
   * multi-threading data loader
   * multi-gpu training
