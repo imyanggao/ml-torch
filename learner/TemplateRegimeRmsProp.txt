@@ -1,0 +1,41 @@
+return {
+-- Table: {1}
+{
+   ["method"]="rmsprop",
+   ["step"]={2},
+   ["maxEpoch"]=100,
+},
+-- Table: {2}
+{
+   {3},
+   {4},
+},
+-- Table: {3}
+{
+   ["endEpoch"]=20,
+   ["begEpoch"]=1,
+   ["state"]={5},
+},
+-- Table: {4}
+{
+   ["endEpoch"]=10000,
+   ["begEpoch"]=21,
+   ["state"]={6},
+},
+-- Table: {5}
+{
+   ["alpha"]=0.99,
+   ["epsilon"]=1e-08,
+   ["weightDecay"]=0,
+   ["initialMean"]=0,
+   ["learningRate"]=0.01,
+},
+-- Table: {6}
+{
+   ["alpha"]=0.99,
+   ["epsilon"]=1e-08,
+   ["weightDecay"]=0,
+   ["initialMean"]=0,
+   ["learningRate"]=0.005,
+},
+}

@@ -1,0 +1,12 @@
+return {
+-- Table: {1}
+{
+   ["nClass"]=100,
+   ["path"]={2},
+},
+-- Table: {2}
+{
+   ["rootDir"]="/home/ygao/local/data/CIFAR100",
+   ["cacheFile"]="/home/ygao/local/data/CIFAR100/cache/CIFAR100.t7",
+},
+}

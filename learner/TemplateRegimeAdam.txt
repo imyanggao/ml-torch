@@ -1,0 +1,43 @@
+return {
+-- Table: {1}
+{
+   ["method"]="adam",
+   ["step"]={2},
+   ["maxEpoch"]=100,
+},
+-- Table: {2}
+{
+   {3},
+   {4},
+},
+-- Table: {3}
+{
+   ["endEpoch"]=20,
+   ["begEpoch"]=1,
+   ["state"]={5},
+},
+-- Table: {4}
+{
+   ["endEpoch"]=10000,
+   ["begEpoch"]=21,
+   ["state"]={6},
+},
+-- Table: {5}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["learningRate"]=0.001,
+   ["learningRateDecay"]=0,
+   ["epsilon"]=1e-08,
+   ["beta2"]=0.999,
+},
+-- Table: {6}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["learningRate"]=0.0005,
+   ["learningRateDecay"]=0,
+   ["epsilon"]=1e-08,
+   ["beta2"]=0.999,
+},
+}

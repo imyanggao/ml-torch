@@ -1,0 +1,25 @@
+return {
+-- Table: {1}
+{
+   ["tensorType"]={2},
+   ["path"]={3},
+},
+-- Table: {2}
+{
+   ["data"]="float",
+   ["label"]="byte",
+},
+-- Table: {3}
+{
+   ["testDir"]="/home/ygao/local/data/ILSVRC/Data/CLS-LOC/test",
+   ["mapFile"]="/home/ygao/local/data/ILSVRC/devkit/data/map_clsloc.txt",
+   ["valFile"]="/home/ygao/local/data/ILSVRC/ImageSets/CLS-LOC/val.txt",
+   ["cacheFile"]="/home/ygao/local/data/ILSVRC/cache/ILSVRC.t7",
+   ["rootDir"]="/home/ygao/local/data/ILSVRC",
+   ["valDir"]="/home/ygao/local/data/ILSVRC/Data/CLS-LOC/val",
+   ["trainDir"]="/home/ygao/local/data/ILSVRC/Data/CLS-LOC/train",
+   ["valBlackListFile"]="/home/ygao/local/data/ILSVRC/devkit/data/ILSVRC2015_clsloc_validation_blacklist.txt",
+   ["valTruthFile"]="/home/ygao/local/data/ILSVRC/devkit/data/ILSVRC2015_clsloc_validation_ground_truth.txt",
+   ["trainFile"]="/home/ygao/local/data/ILSVRC/ImageSets/CLS-LOC/train_cls.txt",
+},
+}

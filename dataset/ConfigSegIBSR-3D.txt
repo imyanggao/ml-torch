@@ -1,0 +1,15 @@
+return {
+-- Table: {1}
+{
+   ["ext"]="nii",
+   ["path"]={2},
+   ["dim"]=3,
+   ["trainProp"]=0.7,
+},
+-- Table: {2}
+{
+   ["rootDir"]="/home/ygao/local/data/IBSR",
+   ["originDir"]="/home/ygao/local/data/IBSR/origin_strip",
+   ["cacheFile"]="/home/ygao/local/data/IBSR/cache/IBSR.t7",
+},
+}

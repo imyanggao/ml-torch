@@ -1,0 +1,17 @@
+return {
+-- Table: {1}
+{
+   ["modality"]="all",
+   ["ext"]="mhd",
+   ["path"]={2},
+   ["trainProp"]=0.7,
+   ["time"]=1,
+   ["dim"]=2,
+},
+-- Table: {2}
+{
+   ["rootDir"]="/home/ygao/local/data/IBIS",
+   ["originDir"]="/home/ygao/local/data/IBIS/Avantika_process",
+   ["cacheFile"]="/home/ygao/local/data/IBIS/cache/IBIS.t7",
+},
+}

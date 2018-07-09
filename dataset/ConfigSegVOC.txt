@@ -1,0 +1,21 @@
+return {
+-- Table: {1}
+{
+   ["tensorType"]={2},
+   ["path"]={3},
+},
+-- Table: {2}
+{
+   ["data"]="byte",
+   ["label"]="byte",
+},
+-- Table: {3}
+{
+   ["rootDir"]="/home/ygao/local/data/VOCdevkit",
+   ["dataDir"]="/home/ygao/local/data/VOCdevkit/VOC2012/JPEGImages",
+   ["labelDir"]="/home/ygao/local/data/VOCdevkit/VOC2012/SegmentationClass",
+   ["trainFile"]="/home/ygao/local/data/VOCdevkit/VOC2012/ImageSets/Segmentation/train.txt",
+   ["valFile"]="/home/ygao/local/data/VOCdevkit/VOC2012/ImageSets/Segmentation/val.txt",
+   ["cacheFile"]="/home/ygao/local/data/VOCdevkit/cache/VOC.t7",
+},
+}

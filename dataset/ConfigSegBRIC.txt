@@ -1,0 +1,23 @@
+return {
+-- Table: {1}
+{
+   ["path"]={2},
+   ["modality"]="all",
+   ["label"]="LM",
+   ["dim"]=2,
+   ["ext"]={3},
+   ["time"]=1,
+   ["trainProp"]=0.7,
+},
+-- Table: {2}
+{
+   ["rootDir"]="/home/ygao/local/data/BRIC",
+   ["originDir"]="/home/ygao/local/data/BRIC/Pediatric_UNC_BRIC_WeiliLin/initial_data/fromFeng/manual_segmentations",
+   ["cacheFile"]="/home/ygao/local/data/BRIC/cache/BRIC.t7",
+},
+-- Table: {3}
+{
+   "hdr",
+   "img",
+},
+}

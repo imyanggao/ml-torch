@@ -1,0 +1,111 @@
+return {
+-- Table: {1}
+{
+   ["method"]="adam",
+   ["step"]={2},
+   ["maxEpoch"]=100,
+},
+-- Table: {2}
+{
+   {3},
+   {4},
+},
+-- Table: {3}
+{
+   ["endEpoch"]=20,
+   ["group"]={5},
+   ["begEpoch"]=1,
+},
+-- Table: {4}
+{
+   ["endEpoch"]=10000,
+   ["group"]={6},
+   ["begEpoch"]=21,
+},
+-- Table: {5}
+{
+   {7},
+   {8},
+},
+-- Table: {6}
+{
+   {9},
+   {10},
+},
+-- Table: {7}
+{
+   ["state"]={11},
+   ["index"]={12},
+},
+-- Table: {8}
+{
+   ["state"]={13},
+   ["index"]={14},
+},
+-- Table: {9}
+{
+   ["state"]={15},
+   ["index"]={16},
+},
+-- Table: {10}
+{
+   ["state"]={17},
+   ["index"]={18},
+},
+-- Table: {11}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["epsilon"]=1e-08,
+   ["learningRateDecay"]=0,
+   ["learningRate"]=0.001,
+   ["beta2"]=0.999,
+},
+-- Table: {12}
+{
+   1,
+   2,
+},
+-- Table: {13}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["epsilon"]=1e-08,
+   ["learningRateDecay"]=0,
+   ["learningRate"]=0.0005,
+   ["beta2"]=0.999,
+},
+-- Table: {14}
+{
+   3,
+   4,
+},
+-- Table: {15}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["epsilon"]=1e-08,
+   ["learningRateDecay"]=0,
+   ["learningRate"]=0.001,
+   ["beta2"]=0.999,
+},
+-- Table: {16}
+{
+   1,
+   2,
+},
+-- Table: {17}
+{
+   ["weightDecay"]=0,
+   ["beta1"]=0.9,
+   ["epsilon"]=1e-08,
+   ["learningRateDecay"]=0,
+   ["learningRate"]=0.0005,
+   ["beta2"]=0.999,
+},
+-- Table: {18}
+{
+   3,
+   4,
+},
+}
