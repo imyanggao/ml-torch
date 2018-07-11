@@ -15,7 +15,7 @@ function VGG:initNet(pretrainPath)
   print('fucking')
   utility.net.init('kaiming', self.network)
   if pretrainPath ~= nil then
-    local convParams, fcParams = utility.net.getPretrainVGGParams(pretrainPath)
+    local convParams, fcParams = utility.net.getPretrainVGGParams(pretrainPath, self.network:type())
     if #convParams == #self.convParams then
       print('1111')
       for i = 1, #convParams do
@@ -39,20 +39,19 @@ function VGG:initNet(pretrainPath)
 
     if self.fcParams ~= nil then
       print('222')
-      if #fcParams == #self.fcParams then
-        for i = 1, #fcParams do
-          print(self.fcParams[i][1]:size())
-          print(fcParams[i][1]:size())
-          if self.fcParams[i][1]:isSameSizeAs(fcParams[i][1]) then
-            for k = 1, 2 do
-              self.fcParams[i][k]:copy(fcParams[i][k])
-            end
-          else
-            print('fc layer ' .. i .. ' parameter size in pretrain model does not match')
+      if #fcParams ~= #self.fcParams then
+        print('#fc layer in pretrain model does not match, but still try to see first few layers')
+      end
+      for i = 1, #self.fcParams do
+        print(self.fcParams[i][1]:size())
+        print(fcParams[i][1]:size())
+        if self.fcParams[i][1]:nElement() == fcParams[i][1]:nElement() then
+          for k = 1, 2 do
+            self.fcParams[i][k]:copy(fcParams[i][k]:view(self.fcParams[i][k]:size()))
           end
+        else
+          print('fc layer ' .. i .. ' #parameter in pretrain model does not match')
         end
-      else
-        print('#fc layer in pretrain model does not match')
       end
     end
   end

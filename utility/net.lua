@@ -643,9 +643,9 @@ function net.LSTM(inputDim, outputDim, hiddenDim, nLayer, lstmDim)
   return nn.gModule(inputs, outputs)
 end
 
-function net.getPretrainVGGParams(path)
+function net.getPretrainVGGParams(path, tensorType)
   print(sys.COLORS.red .. 'Loading pretrain VGG model parameters: ' .. path)
-  local vgg = torch.load(path):float()
+  local vgg = torch.load(path):type(tensorType)
   local convParams, fcParams = {{},{},{},{},{}}, {}
   convParams[1][1] = vgg:get(1):parameters()
   convParams[1][2] = vgg:get(3):parameters()
