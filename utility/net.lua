@@ -645,7 +645,7 @@ end
 
 function net.getPretrainVGGParams(path)
   print(sys.COLORS.red .. 'Loading pretrain VGG model parameters: ' .. path)
-  local vgg = torch.load(path)
+  local vgg = torch.load(path):float()
   local convParams, fcParams = {{},{},{},{},{}}, {}
   convParams[1][1] = vgg:get(1):parameters()
   convParams[1][2] = vgg:get(3):parameters()

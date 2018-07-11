@@ -40,14 +40,13 @@ function MTLoader:examples(indices)
       local input, target = self.dataset:preprocess(sample, self.option, 'val')
       if i == 1 then
         inputSz = input:size():totable()
-        exampleData = torch.Tensor(nExamples, table.unpack(inputSz)):typeAs(input)
+        exampleData = torch[self.option.data.inputType](nExamples, table.unpack(inputSz))
         if type(target) == 'number' then
           targetSz = {nil}
-          exampleLabel = torch.Tensor(nExamples, table.unpack(targetSz))
         else
           targetSz = target:size():totable()
-          exampleLabel = torch.Tensor(nExamples, table.unpack(targetSz)):typeAs(target)
         end
+        exampleLabel = torch[self.option.data.targetType](nExamples, table.unpack(targetSz))
       end
       exampleData[i]:copy(input)
       if type(target) == 'number' then
@@ -86,14 +85,13 @@ function MTLoader:iterator()
               -- 3D image: channel * slice * height * width
               -- 2D image + time: time * channel * height * width
               -- 3D image + time: time * channel * slice * height * width
-              batchData = torch.Tensor(curBatchSz, table.unpack(inputSz)):typeAs(input)
+              batchData = torch[__option.data.inputType](curBatchSz, table.unpack(inputSz))
               if type(target) == 'number' then -- classification with integer label
                 targetSz = {nil}
-                batchLabel = torch.Tensor(curBatchSz, table.unpack(targetSz))
               else
                 targetSz = target:size():totable()
-                batchLabel = torch.Tensor(curBatchSz, table.unpack(targetSz)):typeAs(target)
-              end              
+              end
+              batchLabel = torch[__option.data.targetType](curBatchSz, table.unpack(targetSz))
             end
             batchData[i]:copy(input)
             if type(target) == 'number' then

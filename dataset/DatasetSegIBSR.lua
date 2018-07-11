@@ -46,8 +46,8 @@ function DatasetSegIBSR:__init(split, config)
 end
 
 function DatasetSegIBSR:get(i)
-  return {input = self.set[{{i},{1}}]:squeeze(1),
-          target = self.set[{{i},{2}}]:squeeze(2):squeeze(1)}
+  return {input = self.set[{{i},{1}}]:squeeze(1):type('torch.' .. self.config.inputType),
+          target = self.set[{{i},{2}}]:squeeze(2):squeeze(1):type('torch.' .. self.config.targetType)}
 end
 
 function DatasetSegIBSR:size()

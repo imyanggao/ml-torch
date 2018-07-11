@@ -5,9 +5,9 @@ function checkpoint.save(model, option)
   -- model = utility.net.copyNewMetatable(model):float():clearState() -- a clean copy on CPU, BUG: luajit not enough memory
   local clearModel              -- a clean copy on CPU
   if torch.type(model) == 'nn.DataParallelTable' then
-    clearModel = model:get(1):clone():float() 
+    clearModel = model:get(1):clone():type(option.tensorType)
   else
-    clearModel = model:clone():float() 
+    clearModel = model:clone():type(option.tensorType)
   end
   local latestModelPath, bestModelPath = option.log .. '-save-latest-model.t7', option.log .. '-save-best-model.t7'
   local latestOptimPath, bestOptimPath = option.log .. '-save-latest-optim.t7', option.log .. '-save-best-optim.t7'

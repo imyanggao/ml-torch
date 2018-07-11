@@ -30,22 +30,16 @@ local img2d = {}
 --   end
 -- end
 
-function img2d.linearMinMaxNormal()
+function img2d.linearMinMaxNormal(inputMax, targetMax)
   return function(input, target)
     if input ~= nil then
-      local iType, iMin, iMax = input:type(), input:min(), input:max()
-      input = (input:double() - iMin) / (iMax - iMin)
-      if string.find(iType, 'Byte') ~= nil then
-        input = input * 255
-      end
+      local iType, iMin, iMax = torch.type(input), input:min(), input:max()
+      input = (input - iMin) / (iMax - iMin) * inputMax
       input = input:type(iType)
     end
     if target ~= nil then
-      local tType, tMin, tMax = target:type(), target:min(), target:max()
-      target = (target:double() - tMin) / (tMax - tMin)
-      if string.find(tType, 'Byte') ~= nil then
-        target = target * 255
-      end
+      local tType, tMin, tMax = torch.type(target), target:min(), target:max()
+      target = (target:float() - tMin) / (tMax - tMin) * targetMax
       target = target:type(tType)
     end
     return input, target
@@ -98,12 +92,19 @@ end
 
 function img2d.hflip(prob)
   return function(input, target)
+    local tType
+    if target ~= nil then
+      tType = torch.type(target)
+    else
+      tType = nil
+    end
     if torch.uniform() < prob then
       if input ~= nil then
         input = image.hflip(input)
       end
-      if target ~= nil then
-        target = image.hflip(target)
+      if tType ~= nil and tType ~= 'number' then
+        target = image.hflip(target:float())
+        target = target:type(tType)
       end
     end
     return input, target
@@ -122,9 +123,9 @@ function img2d.rotate(degree, interpolation)
       local labels = utility.tsr.unique(target)
       local nLabel = #labels
       local height, width = img2d.size(target)
-      local tmp = torch.DoubleTensor(nLabel, height, width)
+      local tmp = torch.Tensor(nLabel, height, width)
       for i = 1, nLabel do
-        tmp[i] = image.rotate(target:eq(labels[i]):double(), radianRandom, interpolation)
+        tmp[i] = image.rotate(target:eq(labels[i]):float(), radianRandom, interpolation)
       end
       _, tmp = tmp:max(1) 
       tmp = tmp:squeeze(1)        -- may not need squeeze??
@@ -166,9 +167,9 @@ local function scale(input, target, height, width, interpolation)
   if target ~= nil then
     local labels = utility.tsr.unique(target)
     local nLabel = #labels
-    local tmp = torch.DoubleTensor(nLabel, height, width)
+    local tmp = torch.Tensor(nLabel, height, width)
     for i = 1, nLabel do
-      tmp[i] = image.scale(target:eq(labels[i]):double(), width, height, interpolation)
+      tmp[i] = image.scale(target:eq(labels[i]):float(), width, height, interpolation)
     end
     _, tmp = tmp:max(1) 
     tmp = tmp:squeeze(1)        -- may not need squeeze??
@@ -211,11 +212,18 @@ end
 
 -- 1-based coordinate
 local function crop(input, target, h1, w1, hSize, wSize)
-  if input ~= nil then
-    input = image.crop(input, w1 - 1, h1 - 1, w1 + wSize - 1, h1 + hSize - 1)
-  end
+  local tType
   if target ~= nil then
-    target = image.crop(target, w1 - 1, h1 - 1, w1 + wSize - 1, h1 + hSize - 1)
+    tType = torch.type(target)
+  else
+    tType =  nil
+  end
+  if input ~= nil then
+    input = image.crop(input:float(), w1 - 1, h1 - 1, w1 + wSize - 1, h1 + hSize - 1)
+  end
+  if tType ~= nil and tType ~= 'number' then
+    target = image.crop(target:float(), w1 - 1, h1 - 1, w1 + wSize - 1, h1 + hSize - 1)
+    target = target:type(tType)
   end
   return input, target
 end

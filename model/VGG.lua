@@ -12,10 +12,12 @@ function VGG:__init(imgSz, nClass, convPlanes, convLayers, pad, fcDims, pretrain
 end
 
 function VGG:initNet(pretrainPath)
+  print('fucking')
   utility.net.init('kaiming', self.network)
   if pretrainPath ~= nil then
     local convParams, fcParams = utility.net.getPretrainVGGParams(pretrainPath)
     if #convParams == #self.convParams then
+      print('1111')
       for i = 1, #convParams do
         if #convParams[i] == #self.convParams[i] then
           for j = 1, #convParams[i] do
@@ -36,8 +38,11 @@ function VGG:initNet(pretrainPath)
     end
 
     if self.fcParams ~= nil then
+      print('222')
       if #fcParams == #self.fcParams then
         for i = 1, #fcParams do
+          print(self.fcParams[i][1]:size())
+          print(fcParams[i][1]:size())
           if self.fcParams[i][1]:isSameSizeAs(fcParams[i][1]) then
             for k = 1, 2 do
               self.fcParams[i][k]:copy(fcParams[i][k])

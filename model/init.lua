@@ -13,7 +13,7 @@ require('model.FCSLSTMVGG')
 require('model.UNet')
 
 function model.setup(option)
-  local useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
+  option.useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
   print('\n=> Creating model: ' .. option.model.network)
   local tNet
   if string.find(option.model.network, 'VGG') then
@@ -41,7 +41,7 @@ function model.setup(option)
 
   local network = tNet.network
   local criterion = nn[option.model.criterion](option.data.hist, true, option.data.ignoreIndex)
-  if useCuda > 0 then
+  if option.useCuda > 0 then
     network = network:cuda()
     criterion = criterion:cuda()
   end
@@ -63,11 +63,11 @@ function model.setup(option)
       :threads(
         function()
           require('nngraph')
-          if useCuda == 2 then
+          if option.useCuda == 2 then
             require('cudnn')
             -- cudnn.benchmark = true
             -- cudnn.fastest = true
-          elseif useCuda == 1 then
+          elseif option.useCuda == 1 then
             require('cunn')
           end
         end

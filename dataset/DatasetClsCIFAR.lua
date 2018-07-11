@@ -17,7 +17,7 @@ function DatasetClsCIFAR:__init(split, config)
 end
 
 function DatasetClsCIFAR:get(i)
-  return {input = self.set.data[i]:float(),
+  return {input = self.set.data[i]:type('torch.' .. self.config.inputType),
           target = self.set.label[i]}
 end
 
@@ -42,16 +42,16 @@ function DatasetClsCIFAR:preprocess(sample, option, split)
   local meanstd
   if self.config.nClass == 10 then
     -- compute from entire CIFAR-10 training set
-    meanstd = {mean = torch.Tensor({125.3, 123.0, 113.9}),
-               std = torch.Tensor({63.0, 62.1, 66.7})}
+    meanstd = {mean = torch[self.config.inputType]({125.3, 123.0, 113.9}),
+               std = torch[self.config.inputType]({63.0, 62.1, 66.7})}
   elseif self.config.nClass == 100 then
     -- compute from entire CIFAR-100 training set with this code:
     -- dataset = torch.load('cifar-100.t7')
     -- tt = dataset.train.data:double():transpose(2,4):reshape(50000*32*32, 3)
     -- tt:mean(1)
     -- tt:std(1)
-    meanstd = {mean = torch.Tensor({129.3, 124.1, 112.4}),
-               std = torch.Tensor({68.2, 65.4, 70.4})}
+    meanstd = {mean = torch[self.config.inputType]({129.3, 124.1, 112.4}),
+               std = torch[self.config.inputType]({68.2, 65.4, 70.4})}
   else
     error('invalid config.nClass (only 10 and 100): ' .. self.config.nClass)
   end

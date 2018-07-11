@@ -31,14 +31,13 @@ function SimpleLoader:iterator()
           -- 3D image: channel * slice * height * width
           -- 2D image + time: time * channel * height * width
           -- 3D image + time: time * channel * slice * height * width
-          batchData = torch.Tensor(curBatchSz, table.unpack(inputSz)):typeAs(input)
+          batchData = torch[self.option.data.inputType](curBatchSz, table.unpack(inputSz))
           if type(target) == 'number' then -- classification with integer label
             targetSz = {nil}
-            batchLabel = torch.Tensor(curBatchSz, table.unpack(targetSz))
           else
             targetSz = target:size():totable()
-            batchLabel = torch.Tensor(curBatchSz, table.unpack(targetSz)):typeAs(target)
-          end              
+          end
+          batchLabel = torch[self.option.data.targetType](curBatchSz, table.unpack(targetSz))
         end
         batchData[i]:copy(input)
         if type(target) == 'number' then

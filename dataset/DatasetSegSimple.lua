@@ -49,7 +49,8 @@ function DatasetSegSimple:get(i)
   end
   data, label = utility.img2d.scale(self.config.height, self.config.width)(data, label)
   label = label:squeeze(1)
-  return {input = data, target = label}
+  return {input = data:type('torch.' .. self.config.inputType),
+          target = label:type('torch.' .. self.config.targetType)}
 end
 
 function DatasetSegSimple:size()
@@ -64,7 +65,7 @@ function DatasetSegSimple:histLabels()
       xlua.progress(i, self:size())
       local _, label = self:preprocess(self:get(i))
       if i == 1 then
-        labels = torch.Tensor(self:size(), table.unpack(label:size():totable()))
+        labels = torch[self.config.targetType](self:size(), table.unpack(label:size():totable()))
       end
       labels[i] = label
     end

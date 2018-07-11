@@ -101,7 +101,8 @@ function DatasetSegBRIC:get(i)
   else
     input, target = self.set[{{i},{1,-2}}]:squeeze(1), self.set[{{i},{-1}}]:squeeze(2):squeeze(1)
   end
-  return {input = input, target = target}
+  return {input = input:type('torch.' .. self.config.inputType),
+          target = target:type('torch.' .. self.config.targetType)}
 end
 
 function DatasetSegBRIC:size()
@@ -153,8 +154,8 @@ function DatasetSegBRIC:preprocess(sample, option, split)
     inputSz[sample.input:dim()] = width
     targetSz[sample.target:dim()-1] = height
     targetSz[sample.target:dim()] = width
-    input = torch.Tensor(inputSz):typeAs(sample.input)
-    target = torch.Tensor(targetSz):typeAs(sample.target)
+    input = torch[self.config.inputType](inputSz)
+    target = torch[self.config.targetType](targetSz)
     for t = 1, #self.tm[1] do
       input[t], target[t] = transforms(sample.input[t], sample.target[t])
     end

@@ -38,7 +38,8 @@ function DatasetClsILSVRC:get(i)
   local path = ffi.string(self.set.datapath[i]:data())
   local data = self:loadImage(paths.concat(self.rootData, path) .. '.JPEG', 'data')
   local label = self.set.label[i]
-  return {input = data:float(), target = label}
+  return {input = data:type('torch.' .. self.config.inputType),
+          target = label}
 end
 
 function DatasetClsILSVRC:size()
@@ -60,10 +61,10 @@ function DatasetClsILSVRC:preprocess(sample, option, split)
   split = split or self.split
   local input, target, transforms = sample.input, sample.target
   -- compute from random subset of ImageNet training set
-  local meanstd = {mean = torch.Tensor({0.485, 0.456, 0.406}),
-                   std = torch.Tensor({0.229, 0.224, 0.225})}
-  local pca = {eigval = torch.Tensor({0.2175, 0.0188, 0.0045}),
-               eigvec = torch.Tensor({
+  local meanstd = {mean = torch[self.config.inputType]({0.485, 0.456, 0.406}),
+                   std = torch[self.config.inputType]({0.229, 0.224, 0.225})}
+  local pca = {eigval = torch[self.config.inputType]({0.2175, 0.0188, 0.0045}),
+               eigvec = torch[self.config.inputType]({
                    {-0.5675, 0.7192, 0.4009},
                    {-0.5808, -0.0045, -0.8140},
                    {-0.5836, -0.6948, 0.4203}})}

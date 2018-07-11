@@ -4,6 +4,8 @@ local opt = {}
 function opt.parse(arg)
   local cmd = torch.CmdLine()
   cmd:text('Options:')
+  -- torch
+  cmd:option('-tensorType',     'FloatTensor',           'set default tensor type')
   -- action options
   cmd:option('-resume',         false,                   'if use -resume, resume from checkpoint (if existed)')
   cmd:option('-retrain',        '',                      'use the model in specified checkpoint to retrain')
@@ -26,12 +28,14 @@ function opt.parse(arg)
   -- data options
   cmd:option('-dataset',        'ibsr',                  'options: cifar10 | cifar100 | imagenet | voc | voc-sbd | bric | ibis | ibsr')
   cmd:option('-datasetConfig',  '',                      'when specified, use dataset config file')
+  cmd:option('-dataInputType',  'FloatTensor',           'default tensor type for data.input')
+  cmd:option('-dataTargetType', 'LongTensor',            'default tensor type for data.target')
   cmd:option('-dataDim',        2,                       'options: 2 | 3 to use as 2d or 3d image (for medical imaging)')
   cmd:option('-dataTime',       false,                   'if use -dataTime, use as time series data (if possible)')
   cmd:option('-preprocess',     1,                       'options: 0 | 1 (use preprocessing)')
   cmd:option('-ignoreIndex',    -100,                    'ignore specific class index in loss function')
   -- optimization options
-  cmd:option('-maxEpoch',       2000,                     'max number of total epochs to run')
+  cmd:option('-maxEpoch',       2000,                    'max number of total epochs to run')
   cmd:option('-optimRegimePath','',                      'optimization regime path')
   cmd:option('-optimMethod',    'adam',                  'options: adam | rmsprop | sgd')
   cmd:option('-lr',             1e-3,                    'learning rate')
@@ -84,6 +88,8 @@ function opt.parse(arg)
     option.pretrainPath = nil
   end
 
+  torch.setdefaulttensortype('torch.' .. option.tensorType)
+  
   option.action = {resume = option.resume, retrain = option.retrain}
   option.resume, option.retrain = nil, nil
 
@@ -126,10 +132,11 @@ function opt.parse(arg)
   option.loaderType, option.nThreads, option.batchSize = nil, nil, nil
 
   option.data = {set = option.dataset, setConfig = option.datasetConfig,
+                 inputType = option.dataInputType, targetType = option.dataTargetType,
                  dim = option.dataDim, time = option.dataTime, preprocess = option.preprocess,
                  ignoreIndex = option.ignoreIndex}
   option.dataset, option.datasetConfig, option.dataDim, option.dataTime = nil, nil, nil, nil
-  option.preprocess, option.ignoreIndex = nil, nil
+  option.dataInputType, option.dataTargetType, option.preprocess, option.ignoreIndex = nil, nil, nil, nil
 
   if option.lrFinder == true and option.maxEpoch > 5 then
     option.maxEpoch = 5

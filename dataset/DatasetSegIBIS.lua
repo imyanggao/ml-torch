@@ -79,7 +79,8 @@ function DatasetSegIBIS:get(i)
   else
     input, target = self.set[{{i},{1,-2}}]:squeeze(1), self.set[{{i},{-1}}]:squeeze(2):squeeze(1)
   end
-  return {input = input, target = target}
+  return {input = input:type('torch.' .. self.config.inputType),
+          target = target:type('torch.' .. self.config.targetType)}
 end
 
 function DatasetSegIBIS:size()
@@ -98,7 +99,7 @@ function DatasetSegIBIS:histLabels()
       self.hist = self.set[{{},{-1}}]:double():histc(#self.lbls)
     end
   end
-  return self.hist
+ return self.hist
 end
 
 function DatasetSegIBIS:imageSize()
@@ -139,8 +140,8 @@ function DatasetSegIBIS:preprocess(sample, option, split)
     inputSz[sample.input:dim()] = width
     targetSz[sample.target:dim()-1] = height
     targetSz[sample.target:dim()] = width
-    input = torch.Tensor(inputSz):typeAs(sample.input)
-    target = torch.Tensor(targetSz):typeAs(sample.target)
+    input = torch[self.config.inputType](inputSz)
+    target = torch[self.config.targetType](targetSz)
     for t = 1, #self.tm[1] do
       input[t], target[t] = transforms(sample.input[t], sample.target[t])
     end

@@ -37,7 +37,8 @@ function DatasetSegVOC:get(i)
   path = ffi.string(self.set.labelpath[i]:data())
   local label = self:loadImage(paths.concat(self.labelDir, path) .. '.png', 'label')
   label = self.Colormap:c2l(label)
-  return {input = data:float(), target = label}
+  return {input = data:type('torch.' .. self.config.inputType),
+          target = label:type('torch.' .. self.config.targetType)}
 end
 
 function DatasetSegVOC:size()
@@ -71,14 +72,14 @@ function DatasetSegVOC:preprocess(sample, option, split)
   -- target[target:eq(22)] = 1
   local meanstd
   if string.find(option.model.pretrainPath, 'vgg') then
-    meanstd = {mean = torch.Tensor({123.68, 116.779, 103.939}),
-               std = torch.Tensor({1, 1, 1})}
+    meanstd = {mean = torch[self.config.inputType]({123.68, 116.779, 103.939}),
+               std = torch[self.config.inputType]({1, 1, 1})}
   else
-    meanstd = {mean = torch.Tensor({0, 0, 0}),
-               std = torch.Tensor({1, 1, 1})}
+    meanstd = {mean = torch[self.config.inputType]({0, 0, 0}),
+               std = torch[self.config.inputType]({1, 1, 1})}
   end
-  local norm = {mean = torch.Tensor({0, 0, 0}),
-                std = torch.Tensor({255, 255, 255})}
+  local norm = {mean = torch[self.config.inputType]({0, 0, 0}),
+                std = torch[self.config.inputType]({255, 255, 255})}
   if self.config.preprocess == 1 then
     if split == 'train' then
       transforms = utility.img2d.transInOrder(

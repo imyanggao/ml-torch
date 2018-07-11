@@ -76,6 +76,8 @@ function dataset.setup(option)
   end
   local config = utility.tbl.load(configFile)
   config.preprocess = option.data.preprocess
+  config.inputType = option.data.inputType
+  config.targetType = option.data.targetType
   local trainSet, validSet = dataset[key]('train', config)
   if option.lrFinder == false then
     validSet = dataset[key]('val', config)

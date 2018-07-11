@@ -22,7 +22,7 @@ function SemanticSeg:example(set, loader)
                            :expand(3,table.unpack(self.option.example.imageHW)))
         else
           -- intensity normalization for prediction, only for display purpose
-          img[r][i]:copy(utility.img2d.linearMinMaxNormal()(l[i]))
+          img[r][i]:copy(utility.img2d.linearMinMaxNormal(255)(l[i]))
         end
       end
     end
@@ -57,7 +57,7 @@ function SemanticSeg:example(set, loader)
         else
           for j = 1, m do
             -- intensity normalization for gray scale image, only for display purpose
-            self.option.example[set].image[j][i]:copy(utility.img2d.linearMinMaxNormal()(self.option.example[set].batch.input[i][j]))
+            self.option.example[set].image[j][i]:copy(utility.img2d.linearMinMaxNormal(255)(self.option.example[set].batch.input[i][j]))
           end
         end
         fileStr = fileStr .. '_' .. self.option.example[set].indices[i]
@@ -82,7 +82,7 @@ function SemanticSeg:example(set, loader)
           else
             for j = 1, m do
               -- intensity normalization for gray scale image, only for display purpose
-              self.option.example[set].allImage[j][i]:copy(utility.img2d.linearMinMaxNormal()(self.option.example[set].batch.input[i][j]))
+              self.option.example[set].allImage[j][i]:copy(utility.img2d.linearMinMaxNormal(255)(self.option.example[set].batch.input[i][j]))
             end
           end
         end      

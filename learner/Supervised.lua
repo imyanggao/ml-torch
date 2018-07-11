@@ -19,10 +19,12 @@ function Supervised:__init(model, criterion, option)
   end
   
   -- create data cache type according to model type
-  -- self.input = torch.Tensor():typeAs(self.model)
-  -- self.target = torch.Tensor():typeAs(self.model)
-  self.input = torch.Tensor():typeAs(self.model:get(1))
-  self.target = torch.Tensor():typeAs(self.model:get(1))
+  self.input = torch[self.option.data.inputType]()
+  self.target = torch[self.option.data.targetType]()
+  if self.option.useCuda > 0 then
+    self.input = self.input:cuda()
+    self.target = self.target:cuda()
+  end
 end
 
 function Supervised:modeFlag(set)
