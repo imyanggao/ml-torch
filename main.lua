@@ -16,7 +16,14 @@ trainer = learner.setup(network, criterion, option)
 
 local optionPath = option.log .. '-option-' .. os.date("%Y_%m_%d_%X")
 utility.tbl.save(optionPath, option)
-print(option)
+print(sys.COLORS.green .. 'Options:')
+if option.data.colormap ~= nil then
+  local reducedOption = utility.tbl.shallowCopy(option)
+  reducedOption.data.colormap.hash =  nil
+  print(reducedOption)
+else
+  print(option)
+end
 
 local best, startEpoch, measure = option.optim.bestMeasure, option.optim.iEpoch
 for epoch = startEpoch, option.optim.maxEpoch do
@@ -32,6 +39,7 @@ for epoch = startEpoch, option.optim.maxEpoch do
       utility.checkpoint.save(network, option)
     end
   end
+  collectgarbage()
 end
 
 if option.lrFinder == true then

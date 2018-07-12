@@ -79,7 +79,7 @@ function Supervised:update()
           if self.option.optim.multiLR == true then
             for j = 1, #self.option.optim.regime.step[i].group do
               for k, v in pairs(self.option.optim.regime.step[i].group[j].index) do
-                self.option.optim.state[v] = utility.tbl.clone(self.option.optim.regime.step[i].group[j].state)
+                self.option.optim.state[v] = utility.tbl.deepClone(self.option.optim.regime.step[i].group[j].state)
               end
             end
           else

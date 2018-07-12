@@ -33,19 +33,34 @@ function tbl.inv(tbl)
   return invTbl
 end
 
-function tbl.clone(input)
+-- may cause stack overflow
+function tbl.deepClone(input)
   local inputType = type(input)
   local copy
   if inputType == 'table' then
     copy = {}
     for k, v in next, input, nil do
-      copy[tbl.clone(k)] = tbl.clone(v)
+      copy[tbl.deepClone(k)] = tbl.deepClone(v)
     end
-    setmetatable(copy, tbl.clone(getmetatable(input)))
+    setmetatable(copy, tbl.deepClone(getmetatable(input)))
   else
     copy = input                -- for number, string, boolean, etc
   end
   return copy
+end
+
+function tbl.shallowCopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+            copy[orig_key] = orig_value
+        end
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
 
 function tbl.tsrClone(tbl, resetZero)
