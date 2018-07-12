@@ -6,6 +6,7 @@ require('nngraph')
 -- please notice there is no fc layers in fcn and all fc layers transfer to conv layers
 -- fc naming here is just for convention
 function FCNVGG:__init(imgSz, nClass, convPlanes, convLayers, pad, fcDims, fuseLvl, pretrainPath)
+  self.pretrainPath = pretrainPath
   self:allConv(imgSz, nClass, convPlanes, convLayers, pad)
   self:allFC(fcDims)
   self:allFConv(fuseLvl)
@@ -19,16 +20,22 @@ function FCNVGG:grpFC(idx)
   local h, w, k, m = self.fcH[idx-1], self.fcW[idx-1], 1
   -- 1st kernel size must be 7 to reduce the size of dim from (h+198)/32 to (h+6)/32
   if idx == 1 then
-    -- k = 7
-    k = 1
+    if self.pretrainPath ~= nil then
+      k = 7
+    else
+      k = self.fcH[0]             -- for vgg16, k = 7, but for others k = self.fcH[0]
+    end
+    -- k = 1
   end
   if idx == self.nFC then
     m = Conv2D(self.fcDims[idx-1], self.nClass, k,k, 1,1, 0,0) -- deconv1,2,3,5,8,9
     -- m = Conv2D(self.fcDims[idx-1], 2*self.nClass, k,k, 1,1, 0,0) -- deconv4
     -- m = Conv2D(self.fcDims[idx-1], self.convPlanes[self.nConv], k,k, 1,1, 0,0) -- deconv6, deconv7
     h, w = utility.net.outputSize2D('conv', h, w, k,k, 1,1, 0,0)
+    self.fcParams[idx] = m:parameters()
   else
     m, h, w = utility.net.conv2DBNReLU(self.fcDims[idx-1], self.fcDims[idx], k, 1, 0, h, w)
+    self.fcParams[idx] = m:get(1):parameters()
   end
   self.fcH[idx], self.fcW[idx] = h, w
   return m
@@ -41,6 +48,7 @@ function FCNVGG:allFC(fcDims)
   self.fcW = {[0] = self.bridgeW[self.nConv]}
   self.nFC = #self.fcDims + 1
   self.fc = {}
+  self.fcParams = {}
   for i = 1, self.nFC do
     self.fc[i] = self:grpFC(i)
   end
@@ -60,14 +68,17 @@ function FCNVGG:grpFConv(idx)
   --   p = 0
   -- end
   
-  local k, d, p, m = 4, 2, 1
+  local k, d, p, m = 4, 2, 0
   -- local k, d, p, m = 6, 2, 2    -- deconv5
   -- local nIn, nOut = self.convPlanes[self.nFConv-idx+1], self.convPlanes[self.nFConv-idx] -- deconv6, deconv7
   if idx == self.nFConv then
-    k = 64 / math.pow(2, self.nFConv-1)
-    d = k / 2
-    p = (k - d)/2
+    -- k = 64 / math.pow(2, self.nFConv-1)
+    -- d = k / 2
+    -- p = (k - d)/2
     -- nOut = self.nClass          -- deconv6, deconv7
+    d = math.ceil(self.convH[0] / (self.fconvH[idx-1] + 1))
+    k = d * 2
+    p = 0
   end
   
   -- if idx > 1 then
@@ -142,4 +153,7 @@ function FCNVGG:createNet()
   end
   local output = LogSoftMax()(nn.View(-1, self.nClass)(nn.Transpose({2,3}, {3,4})(gfconv[self.nFConv])))
   self.network = nn.gModule({input}, {output})
+  print(self.bridgeH)
+  print(self.fcH)
+  print(self.fconvH)
 end
