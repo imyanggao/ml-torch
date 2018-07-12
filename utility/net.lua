@@ -80,7 +80,7 @@ function net.gpu(gpuid, minSz, seed)
     -- sort gpuid according to the free gpu memory size
     -- this would ease the out-of-memory error in multi-gpu training
     local _, index = torch.sort(freeMem, true)
-    local originid = utility.tbl.clone(gpuid)
+    local originid = utility.tbl.deepClone(gpuid)
     for i = 1, index:nElement() do
       gpuid[i] = originid[index[i]]
     end
@@ -644,7 +644,7 @@ function net.LSTM(inputDim, outputDim, hiddenDim, nLayer, lstmDim)
 end
 
 function net.getPretrainVGGParams(path, tensorType)
-  print(sys.COLORS.red .. 'Loading pretrain VGG model parameters: ' .. path)
+  print(sys.COLORS.green .. 'Loading pretrain VGG model parameters: ' .. path)
   local vgg = torch.load(path):type(tensorType)
   local convParams, fcParams = {{},{},{},{},{}}, {}
   convParams[1][1] = vgg:get(1):parameters()

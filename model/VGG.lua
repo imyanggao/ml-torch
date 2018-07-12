@@ -12,12 +12,10 @@ function VGG:__init(imgSz, nClass, convPlanes, convLayers, pad, fcDims, pretrain
 end
 
 function VGG:initNet(pretrainPath)
-  print('fucking')
   utility.net.init('kaiming', self.network)
   if pretrainPath ~= nil then
     local convParams, fcParams = utility.net.getPretrainVGGParams(pretrainPath, self.network:type())
     if #convParams == #self.convParams then
-      print('1111')
       for i = 1, #convParams do
         if #convParams[i] == #self.convParams[i] then
           for j = 1, #convParams[i] do
@@ -26,34 +24,35 @@ function VGG:initNet(pretrainPath)
                 self.convParams[i][j][k]:copy(convParams[i][j][k])
               end
             else
-              print('conv block ' .. i .. ' layer ' .. j .. ' parameter size in pretrain model does not match')
+              print(sys.COLORS.red .. 'conv block ' .. i .. ' layer ' .. j ..
+                      ' parameter size in pretrain model does not match')
             end
           end
         else
-          print('#conv layer in pretrain model does not match')
+          print(sys.COLORS.red .. '#conv layer in pretrain model does not match')
         end
       end
     else
-      print('#conv block in pretrain model does not match')
+      print(sys.COLORS.red .. '#conv block in pretrain model does not match')
     end
 
     if self.fcParams ~= nil then
-      print('222')
       if #fcParams ~= #self.fcParams then
-        print('#fc layer in pretrain model does not match, but still try to see first few layers')
+        print(sys.COLORS.red .. '#fc layer in pretrain model does not match, but still try to see first few layers')
       end
       for i = 1, #self.fcParams do
-        print(self.fcParams[i][1]:size())
-        print(fcParams[i][1]:size())
         if self.fcParams[i][1]:nElement() == fcParams[i][1]:nElement() then
           for k = 1, 2 do
             self.fcParams[i][k]:copy(fcParams[i][k]:view(self.fcParams[i][k]:size()))
           end
         else
-          print('fc layer ' .. i .. ' #parameter in pretrain model does not match')
+          print(sys.COLORS.red .. 'fc layer ' .. i .. ' #parameter in pretrain model does not match')
+          print(self.fcParams[i][1]:size())
+          print(fcParams[i][1]:size())
         end
       end
     end
+    convParams, fcParams = nil, nil
   end
 end
 
