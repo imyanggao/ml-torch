@@ -50,7 +50,7 @@ function Colormap:update()
   if self.map == 'voc' then
     self.cmap = cmapVOC(self.ncolor)
   end
-  self:hash()
+  self:hashmap()
 end
 
 -- transfer a n * 3 tensor to n * 1 tensor
@@ -59,7 +59,7 @@ local function squeezeTsr(tsr)
   return tsr[{{},1}] + torch.lshift(tsr[{{},2}], 8) + torch.lshift(tsr[{{},3}], 16) + 1000
 end
 
-function Colormap:hash()
+function Colormap:hashmap()
   local key = squeezeTsr(self.cmap)
   self.hash = {}
   for i = 1, key:numel() do
