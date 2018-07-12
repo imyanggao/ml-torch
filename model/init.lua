@@ -13,7 +13,8 @@ require('model.FCSLSTMVGG')
 require('model.UNet')
 
 function model.setup(option)
-  option.useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
+  local useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
+  option.useCuda = useCuda
   print('\n=> Creating model: ' .. option.model.network)
   local tNet
   if string.find(option.model.network, 'VGG') then
@@ -63,11 +64,11 @@ function model.setup(option)
       :threads(
         function()
           require('nngraph')
-          if option.useCuda == 2 then
+          if useCuda == 2 then
             require('cudnn')
             -- cudnn.benchmark = true
             -- cudnn.fastest = true
-          elseif option.useCuda == 1 then
+          elseif useCuda == 1 then
             require('cunn')
           end
         end
