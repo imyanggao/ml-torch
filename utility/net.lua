@@ -494,6 +494,30 @@ function net.conv2DBNReLU(nIn, nOut, k, d, pad, iH, iW)
   return m, oH, oW
 end
 
+function net.conv2DReLU(nIn, nOut, k, d, pad, iH, iW)
+  local m = nn.Sequential()
+  m:add(Conv2D(nIn, nOut, k,k, d,d, pad,pad))
+  m:add(ReLU(true))
+  local oH, oW =  nil, nil
+  if iH ~= nil and iW ~= nil then
+    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+  end
+  return m, oH, oW
+end
+
+function net.conv2DReLUDropout(nIn, nOut, k, d, pad, iH, iW, p)
+  p = p or 0.5
+  local m = nn.Sequential()
+  m:add(Conv2D(nIn, nOut, k,k, d,d, pad,pad))
+  m:add(ReLU(true))
+  m:add(nn.Dropout(p))
+  local oH, oW =  nil, nil
+  if iH ~= nil and iW ~= nil then
+    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+  end
+  return m, oH, oW
+end
+
 function net.graphConv2DBNReLU(nIn, nOut, k, d, pad, iH, iW, str)
   str = str or ''
   local oH, oW =  nil, nil
@@ -513,6 +537,15 @@ function net.linearBNReLU(nIn, nOut)
   m:add(nn.Linear(nIn, nOut))
   m:add(BN(nOut))
   m:add(ReLU(true))
+  return m
+end
+
+function net.linearReLUDropout(nIn, nOut, p)
+  p = p or 0.5
+  local m = nn.Sequential()
+  m:add(nn.Linear(nIn, nOut))
+  m:add(ReLU(true))
+  m:add(nn.Dropout(p))
   return m
 end
 
@@ -664,6 +697,35 @@ function net.getPretrainVGGParams(path, tensorType)
   fcParams[2] = vgg:get(36):parameters()
   fcParams[3] = vgg:get(39):parameters()
   return convParams, fcParams
+end
+
+function net.getBilinearWeights(weightSize, iH, iW, oH, oW)
+  -- weightSize for deconv: in * out * h * w
+  local h, w, ch, cw = weightSize:size(3), weightSize:size(4)
+  local sh, sw = oH / iH, oW / iW
+  if h % 2 == 1 then
+    ch = sh - 1
+  else
+    ch = sh - 0.5
+  end
+  if w % 2 == 1 then
+    cw = sw - 1
+  else
+    cw = sw - 0.5
+  end
+  local bilinear = torch.zeros(h, w)
+  for i = 1, h do
+    for j = 1, w do
+      bilinear[i][j] = (1 - math.abs((i - 1 - ch) / sh)) * (1 - math.abs((j - 1 - cw) / sw))
+    end
+  end
+  local weights = torch.Tensor(weightSize)
+  for i = 1, weights:size(1) do
+    for j = 1, weights:size(2) do
+      weights[i][j]:copy(bilinear)
+    end
+  end
+  return weights
 end
 
 utility.net = net
