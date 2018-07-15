@@ -699,10 +699,23 @@ function net.getPretrainVGGParams(path, tensorType)
   return convParams, fcParams
 end
 
-function net.getBilinearWeights(weightSize, iH, iW, oH, oW)
-  -- weightSize for deconv: in * out * h * w
+function net.getBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
+  -- weightSize for deconv: nIn * nOut * kH * kW
+  local oH, oW = net.outputSize2D('fconv', iH, iW, kH, kW, dH, dW, padH, padW)
+  local sH, sW = oH / iH, oW / iW
+  assert(kH >= math.floor(sH + 1), 'height kernel < floor(height scale + 1), height kernel can not cover two neighbors')
+  assert(kW >= math.floor(sW + 1), 'width kernel < floor(width scale + 1), width kernel can not cover two neighbors')
+  local cH, cW = (kH - 1) / 2 + 1, (kW - 1) / 2 + 1
+  local eH, eW = math.floor(sH * 2) / 2, math.floor(sW * 2) / 2
+  local kHBeg, kWBeg = math.max(1, math.ceil(cH - eH)), math.max(1, math.ceil(cW - eW))
+  local kHEnd, kWEnd = math.min(kH, math.floor(cH + eH)), math.min(kW, math.floor(cW + eW))
+  local lH, lW = torch.zeros(kH), toch.zeros(kW)
+  for i = kHBeg, kHEnd do
+    lH[i] = (1 - math.abs((i - cH) / sH)) * (
+  end
+  
   local h, w, ch, cw = weightSize:size(3), weightSize:size(4)
-  local sh, sw = oH / iH, oW / iW
+  
   if h % 2 == 1 then
     ch = sh - 1
   else
