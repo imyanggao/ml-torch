@@ -703,8 +703,8 @@ function net.getBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
   -- weightSize for deconv: nIn * nOut * kH * kW
   local oH, oW = net.outputSize2D('fconv', iH, iW, kH, kW, dH, dW, padH, padW)
   local sH, sW = oH / iH, oW / iW
-  assert(kH >= math.floor(sH + 1), 'height kernel < floor(height scale + 1), height kernel can not cover two neighbors')
-  assert(kW >= math.floor(sW + 1), 'width kernel < floor(width scale + 1), width kernel can not cover two neighbors')
+  -- assert(kH >= math.floor(sH + 1), 'height kernel < floor(height scale + 1), height kernel can not cover two neighbors')
+  -- assert(kW >= math.floor(sW + 1), 'width kernel < floor(width scale + 1), width kernel can not cover two neighbors')
   local cH, cW = (kH - 1) / 2 + 1, (kW - 1) / 2 + 1
   local eH, eW = math.floor(sH * 2) / 2, math.floor(sW * 2) / 2
   local kHBeg, kWBeg = math.max(1, math.ceil(cH - eH)), math.max(1, math.ceil(cW - eW))
@@ -715,28 +715,9 @@ function net.getBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
       bilinear[i][j] = (1 - math.abs((i - cH) / sH)) * (1 - math.abs((j - cW) / sW))
     end
   end
-  
-  local h, w, ch, cw = weightSize:size(3), weightSize:size(4)
-  
-  if h % 2 == 1 then
-    ch = sh - 1
-  else
-    ch = sh - 0.5
-  end
-  if w % 2 == 1 then
-    cw = sw - 1
-  else
-    cw = sw - 0.5
-  end
-  local bilinear = torch.zeros(h, w)
-  for i = 1, h do
-    for j = 1, w do
-      bilinear[i][j] = (1 - math.abs((i - 1 - ch) / sh)) * (1 - math.abs((j - 1 - cw) / sw))
-    end
-  end
-  local weights = torch.Tensor(weightSize)
-  for i = 1, weights:size(1) do
-    for j = 1, weights:size(2) do
+  local weights = torch.Tensor(nIn, nOut, kH, kW)
+  for i = 1, nIn do
+    for j = 1, nOut do
       weights[i][j]:copy(bilinear)
     end
   end
