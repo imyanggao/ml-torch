@@ -45,7 +45,9 @@ function str.fixLen(strg, len)
 end
 
 function str.str2tbl(strg, isnum, delimiter)
-  isnum = isnum or false
+  if isnum == nil then
+    isnum = false
+  end
   delimiter = delimiter or '%S+'
   local tbl = {}
   for i in string.gmatch(strg, delimiter) do
