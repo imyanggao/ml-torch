@@ -1,7 +1,4 @@
-
--- require('nn')
--- require('utility.init')
--- utility.net.declare('cudnn')
+require('nngraph')
 
 model = {}
 
@@ -19,20 +16,14 @@ function model.setup(option)
   local tNet
   if string.find(option.model.network, 'VGG') then
     local paramsTbl = {option.data.imageSize, option.data.nClass,
-                       option.vgg.planes, option.vgg.layers, option.vgg.pad}
+                       option.vgg.planes, option.vgg.layers, option.vgg.fc, option.vgg.pad,
+                       option.vgg.bn, option.vgg.dropout, option.model.pretrainPath}
     if option.model.network == 'VGG' then
-      table.insert(paramsTbl, option.vgg.fc)
-      table.insert(paramsTbl, option.model.pretrainPath)
       tNet = model.VGG(table.unpack(paramsTbl))
     elseif option.model.network == 'FCNVGG' then
-      table.insert(paramsTbl, option.vgg.fc)
-      table.insert(paramsTbl, option.vgg.fuse)
-      table.insert(paramsTbl, option.model.pretrainPath)
-      tNet = model.FCNVGG(table.unpack(paramsTbl))
+      tNet = model.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
     elseif option.model.network == 'FCSLSTMVGG' then
-      table.insert(paramsTbl, option.vgg.fc)
       table.insert(paramsTbl, option.vgg.fuse)
-      table.insert(paramsTbl, option.model.pretrainPath)
       tNet = model.FCSLSTMVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fc, option.vgg.fuse)))
     end
   elseif string.find(option.model.network, 'UNet') then

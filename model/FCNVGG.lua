@@ -1,159 +1,198 @@
 
 local FCNVGG, parent = torch.class('model.FCNVGG', 'model.VGG')
 
-require('nngraph')
-
--- please notice there is no fc layers in fcn and all fc layers transfer to conv layers
--- fc naming here is just for convention
-function FCNVGG:__init(imgSz, nClass, convPlanes, convLayers, pad, fcDims, fuseLvl, pretrainPath)
-  self.pretrainPath = pretrainPath
-  self:allConv(imgSz, nClass, convPlanes, convLayers, pad)
-  self:allFC(fcDims)
-  self:allFConv(fuseLvl)
-  self:allCropConv()
-  self:createNet(fuseLvl)
-  -- self:backend(fuseLvl)
-  self:initNet(pretrainPath)
+function FCNVGG:__init(imgSz, nClass, convPlanes, convLayers, fcDims, pad1, bn, dropout, pretrainPath, fuse, post)
+  self:makeConv(imgSz, convPlanes, convLayers, pad1, bn)
+  self:makeFC(nClass, fcDims, dropout, pretrainPath)
+  self:makeDeconv(fuse, post)
+  self:create()
+  self:init()
 end
 
-function FCNVGG:grpFC(idx)
-  local h, w, k, m = self.fcH[idx-1], self.fcW[idx-1], 1
-  -- 1st kernel size must be 7 to reduce the size of dim from (h+198)/32 to (h+6)/32
-  if idx == 1 then
-    if self.pretrainPath ~= nil then
-      k = 7
-    else
-      k = self.fcH[0]             -- for vgg16, k = 7, but for others k = self.fcH[0]
-    end
-    -- k = 1
-  end
-  if idx == self.nFC then
-    m = Conv2D(self.fcDims[idx-1], self.nClass, k,k, 1,1, 0,0) -- deconv1,2,3,5,8,9
-    -- m = Conv2D(self.fcDims[idx-1], 2*self.nClass, k,k, 1,1, 0,0) -- deconv4
-    -- m = Conv2D(self.fcDims[idx-1], self.convPlanes[self.nConv], k,k, 1,1, 0,0) -- deconv6, deconv7
-    h, w = utility.net.outputSize2D('conv', h, w, k,k, 1,1, 0,0)
-    self.fcParams[idx] = m:parameters()
-  else
-    m, h, w = utility.net.conv2DBNReLU(self.fcDims[idx-1], self.fcDims[idx], k, 1, 0, h, w)
-    self.fcParams[idx] = m:get(1):parameters()
-  end
-  self.fcH[idx], self.fcW[idx] = h, w
-  return m
-end
-
-function FCNVGG:allFC(fcDims)
+function FCNVGG:makeFC(nClass, fcDims, dropout, pretrainPath)
+  self.nClass = nClass
   self.fcDims = fcDims or {4096, 4096}
+  self.dropout = dropout
+  self.pretrainPath = pretrainPath
+  local convKernel, convStride, convPad, pretrainKernel = 1, 1, 0, 7
+
+  self.nFc = 1 + #self.fcDims
   self.fcDims[0] = self.convPlanes[self.nConv]
-  self.fcH = {[0] = self.bridgeH[self.nConv]}
-  self.fcW = {[0] = self.bridgeW[self.nConv]}
-  self.nFC = #self.fcDims + 1
-  self.fc = {}
-  self.fcParams = {}
-  for i = 1, self.nFC do
-    self.fc[i] = self:grpFC(i)
-  end
-end
-
-function FCNVGG:grpFConv(idx)
-  -- local k, d, p, m = 4, 2, 0
-  -- if idx == self.nFConv then
-  --   k = 64 / math.pow(2, self.nFConv-1)
-  --   d = k / 2
-  --   p = 0
-  -- end
-  -- local k, d, p, m = 2, 2, 0
-  -- if idx == self.nFConv then
-  --   k = 64 / math.pow(2, self.nFConv-1)
-  --   d = k
-  --   p = 0
-  -- end
-  
-  local k, d, p, m = 4, 2, 0
-  -- local k, d, p, m = 6, 2, 2    -- deconv5
-  -- local nIn, nOut = self.convPlanes[self.nFConv-idx+1], self.convPlanes[self.nFConv-idx] -- deconv6, deconv7
-  if idx == self.nFConv then
-    -- k = 64 / math.pow(2, self.nFConv-1)
-    -- d = k / 2
-    -- p = (k - d)/2
-    -- nOut = self.nClass          -- deconv6, deconv7
-    d = math.ceil(self.convH[0] / (self.fconvH[idx-1] + 1))
-    k = d * 2
-    p = 0
-  end
-  
-  -- if idx > 1 then
-  --   nIn = nIn * 2             -- deconv7
-  -- end
-  m = FConv2D(self.nClass, self.nClass, k,k, d,d, p,p)
-  -- m = FConv2D(2*self.nClass, self.nClass, k,k, d,d, p,p) -- deconv4
-  -- m = FConv2D(nIn, nOut, k,k, d,d, p,p) -- deconv6, deconv7
-  self.fconvH[idx], self.fconvW[idx] =
-    utility.net.outputSize2D('fconv', self.fconvH[idx-1], self.fconvW[idx-1], k,k, d,d, p,p)
-  return m
-end
-
-function FCNVGG:allFConv(fuseLvl)
-  self.fuseLvl = fuseLvl
-  self.fconvH = {[0] = self.fcH[self.nFC]}
-  self.fconvW = {[0] = self.fcW[self.nFC]}
-  self.nFConv = fuseLvl + 1
-  self.fconv = {}
-  for i = 1, self.nFConv do
-    self.fconv[i] = self:grpFConv(i)
-  end
-end
-
-function FCNVGG:grpCropConv(idx)
-  local m
-  if idx == self.nFConv then
-    m = utility.net.centerCrop2D(self.fconvH[idx], self.fconvW[idx], self.imgSz[2], self.imgSz[3])
-  else
-    local i = self.nConv - idx
-    local conv = Conv2D(self.convPlanes[i], self.nClass, 1,1, 1,1, 0,0) -- deconv1-5, deconv8-9
-    local h, w = utility.net.outputSize2D('conv', self.bridgeH[i], self.bridgeW[i], 1,1, 1,1, 0,0) -- deconv1-5, deconv8-9
-    -- local conv = nn.Identity() -- deconv6, deconv7
-    -- local h, w = self.bridgeH[i], self.bridgeW[i] -- deconv6, deconv7
-    -- local crop = utility.net.centerCrop2D(h, w, self.fconvH[idx], self.fconvW[idx]) -- not as generalize as pad2d
-    
-    local crop = utility.net.centerCropPad2D(h, w, self.fconvH[idx], self.fconvW[idx])
-    
-    -- local crop = nn.SpatialUpSamplingBilinear({oheight = self.fconvH[idx], owidth = self.fconvW[idx]}) -- does not work
-    m = nn.Sequential():add(conv):add(crop)
-  end
-  return m
-end
-
-function FCNVGG:allCropConv()
-  self.crop = {}
-  for i = 1, self.nFConv do
-    self.crop[i] = self:grpCropConv(i)
-  end
-end
-
-function FCNVGG:createNet()
-  local input = nn.Identity()()
-  local gconv = {[0] = input}
-  for i = 1, self.nConv do
-    gconv[i] = self.conv[i](gconv[i-1])
-    gconv[i] = self.bridge[i](gconv[i])
-  end
-  local gfc = {[0] = gconv[self.nConv]}
-  for i = 1, self.nFC do
-    gfc[i] = self.fc[i](gfc[i-1])
-  end
-  local gfconv = {[0] = gfc[self.nFC]}
-  for i = 1, self.nFConv do
-    if i == self.nFConv then
-      gfconv[i] = self.crop[i](self.fconv[i](gfconv[i-1]))
+  self.fcH, self.fcW = {[0] = self.bridgeH[self.nConv]}, {[0] = self.bridgeW[self.nConv]}
+  self.fc, self.fcParams, self.fcGradParams = {}, {}, {}
+  for i = 1, self.nFc do
+    local h, w, nIn, nOut = self.fcH[i-1], self.fcW[i-1], self.fcDims[i-1], self.fcDims[i]
+    local kH, kW = convKernel, convKernel
+    if i == 1 then
+      if string.find(self.pretrainPath, 'vgg') then
+        kH, kW = pretrainKernel, pretrainKernel
+      -- else
+      --   -- general way to transfer 1st fc layer to conv layer
+      --   -- we don't want to use this to reduce image size to 1*1 in further if don't have a pretrained model
+      --   kH, kW = self.fcH[0], self.fcW[0]
+      end
+    end
+    if i == self.nFc then
+      nOut = self.nClass
+      self.fc[i] = Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad)
+      self.fcParams[i], self.fcGradParams[i] = self.fc[i]:parameters()
     else
-      gfconv[i] = nn.CAddTable()({self.fconv[i](gfconv[i-1]), self.crop[i](gconv[self.nConv-i])})
-      -- gfconv[i] = Conv2D(self.nClass, self.nClass, 3,3, 1,1, 1,1)(gfconv[i]) -- deconv8
-      -- gfconv[i] = nn.JoinTable(1,3)({self.fconv[i](gfconv[i-1]), self.crop[i](gconv[self.nConv-i])}) -- deconv4, deconv7
+      if self.dropout == true then
+        self.fc[i] = nn.Sequential()
+          :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+          :add(ReLU(true))
+          :add(nn.Dropout(0.5))
+      else
+        if self.bn == true then
+          self.fc[i] = nn.Sequential()
+            :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+            :add(BN2D(nOut))
+            :add(ReLU(true))
+        else
+          self.fc[i] = nn.Sequential()
+            :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+            :add(ReLU(true))
+        end
+      end
+      self.fcParams[i], self.fcGradParams[i] = self.fc[i]:get(1):parameters()
+    end
+    self.fcH[i] = utility.net.outputSize('conv', h, kH, convStride, convPad)
+    self.fcW[i] = utility.net.outputSize('conv', w, kW, convStride, convPad)
+  end
+end
+
+function FCNVGG:makeDeconv(fuse, post)
+  self.fuse = fuse
+  self.post = post
+  local deconvKernel, deconvStride, deconvPad = 4, 2, 1
+  local convKernel, convStride, convPad = 1, 1, 0
+
+  self.deconvH, self.deconvW = {[0] = self.fcH[self.nFc]}, {[0] = self.fcW[self.nFc]}
+  self.deconv, self.deconvConfig, self.deconvParams, self.deconvGradParams = {}, {}, {}, {}
+  self.cconv, self.crop = {}, {}
+  
+  -- for post fuse, max fuse lvl is 4; for pre fuse, max fuse lvl could be 5
+  local kH, kW, sH, sW = deconvKernel, deconvKernel, deconvStride, deconvStride
+  for i = 1, self.fuse do
+    self.deconv[i] = FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad)
+    self.deconvConfig[i] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
+    self.deconvParams[i], self.deconvGradParams[i] = self.deconv[i]:parameters()
+    self.deconvH[i] = utility.net.outputSize('fconv', self.deconvH[i-1], kH, sH, deconvPad)
+    self.deconvW[i] = utility.net.outputSize('fconv', self.deconvW[i-1], kW, sW, deconvPad)
+    local j, h, w
+    if self.post == true then
+      j = self.nConv - i
+      h, w = utility.net.outputSize2D('conv', self.bridgeH[j], self.bridgeW[j], convKernel, convStride, convPad)
+    else
+      j = self.nConv - i + 1
+      h, w = utility.net.outputSize2D('conv', self.convH[j], self.convW[j], convKernel, convStride, convPad)
+    end
+    self.cconv[i] = Conv2D(self.convPlanes[j], self.nClass, convKernel,convKernel, convStride,convStride, convPad,convPad)
+    -- the usual crop apply to conv
+    self.crop[i] = utility.net.centerCropPad2D(h, w, self.deconvH[i], self.deconvW[i])
+  end
+
+  -- for both pre/post fuse, one more deconv may need to ensure same output as image size
+  -- therefore, we firstly check the size after last fuse.
+  -- If the size is not equal to original image size, we apply the last deconv
+  -- for both pre/post fuse, the last deconv is special in the sense that
+  -- it may not just double size the feature, but need to make the feature size at least the image size
+  if self.deconvH[self.fuse] == self.convH[0] and self.deconvW[self.fuse] == self.convW[0] then
+    self.nDeconv = self.fuse
+  else
+    self.nDeconv = self.fuse + 1
+    -- with constraint k = 2*s, s > (size+2p) / (in+1)
+    sH = math.ceil((self.convH[0] + 2 * deconvPad) / (self.deconvH[self.fuse] + 1))
+    sW = math.ceil((self.convW[0] + 2 * deconvPad) / (self.deconvW[self.fuse] + 1))
+    kH = 2 * sH
+    kW = 2 * sW
+    self.deconv[self.nDeconv] = FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad)
+    self.deconvConfig[self.nDeconv] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
+    self.deconvParams[self.nDeconv], self.deconvGradParams[self.nDeconv] = self.deconv[self.nDeconv]:parameters()
+    self.deconvH[self.nDeconv] = utility.net.outputSize('fconv', self.deconvH[self.fuse], kH, sH, deconvPad)
+    self.deconvW[self.nDeconv] = utility.net.outputSize('fconv', self.deconvW[self.fuse], kW, sW, deconvPad)
+    -- the usual crop apply to conv, but the last crop apply to deconv
+    self.crop[self.nDeconv] =
+      utility.net.centerCropPad2D(self.deconvH[self.nDeconv], self.deconvW[self.nDeconv], self.convH[0], self.convW[0])
+  end
+end
+
+function FCNVGG:create()
+  local block = {[0] = nn.Identity()()}
+  for i = 1, self.nConv do
+    if self.post == true then
+      block[i] = self.bridge[i](self.conv[i](block[i-1]))
+    else
+      if i == 1 then
+        block[i] = self.conv[i](block[i-1])
+      else
+        block[i] = self.conv[i](self.bridge[i-1](block[i-1]))
+      end
     end
   end
-  local output = LogSoftMax()(nn.View(-1, self.nClass)(nn.Transpose({2,3}, {3,4})(gfconv[self.nFConv])))
-  self.network = nn.gModule({input}, {output})
-  print(self.bridgeH)
-  print(self.fcH)
-  print(self.fconvH)
+  if self.post == true then
+    block[self.nConv+1] = block[self.nConv]
+  else
+    block[self.nConv+1] = self.bridge[self.nConv](block[self.nConv])
+  end
+  for i = 1, self.nFc do
+    block[self.nConv+1] = self.fc[i](block[self.nConv+1])
+  end
+  local j
+  for i = 1, self.nDeconv do
+    if self.post == true then
+      j = self.nConv - i
+    else
+      j = self.nConv - i + 1
+    end
+    if i <= self.fuse then
+      block[self.nConv+1+i] = nn.CAddTable()({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))})
+    else
+      block[self.nConv+1+i] = self.crop[i](self.deconv[i](block[self.nConv+i]))
+    end
+  end
+  self.network = nn.gModule({block[0]},
+    {LogSoftMax()(nn.View(-1, self.nClass)(nn.Transpose({2,3}, {3,4})(block[self.nConv+1+self.nDeconv])))})
+end
+
+function FCNVGG:init()
+  local convParams, fcParams = parent.init(self)
+
+  if fcParams ~= nil then
+    if #fcParams ~= #self.fcParams then
+      print(sys.COLORS.red .. '#fc layer in pretrain model does not match, but still try to see first few layers')
+    end
+    for i = 1, #self.fcParams do
+      if self.fcParams[i][1]:nElement() == fcParams[i][1]:nElement() then
+        print(sys.COLORS.green .. 'fc layer ' .. i .. ' #parameter in pretrain model does match, so reshape and copy')
+        for k = 1, 2 do
+          self.fcParams[i][k]:copy(fcParams[i][k]:view(self.fcParams[i][k]:size()))
+        end
+      else
+        print(sys.COLORS.red .. 'fc layer ' .. i .. ' #parameter in pretrain model does not match')
+        print(table.unpack(utility.tbl.cat('our model size: ', self.fcParams[i][1]:size():totable())))
+        print(table.unpack(utility.tbl.cat('pretrain model size: ', fcParams[i][1]:size():totable())))
+        local sz
+        if self.fcParams[i][1]:size(1) < fcParams[i][1]:size(1) then
+          print(sys.COLORS.green .. 'still copy a small part of pretrain fc layer ' .. i)
+          sz = self.fcParams[i][1]:size(1)
+          self.fcParams[i][1]:copy(fcParams[i][1][{{1,sz},{}}]:view(self.fcParams[i][1]:size()))
+          self.fcParams[i][2]:copy(fcParams[i][2][{{1,sz}}]:view(self.fcParams[i][2]:size()))
+        else
+          print(sys.COLORS.green .. 'although not enough, use all part of pretrain fc layer ' .. i)
+          sz = fcParams[i][1]:size(1)
+          self.fcParams[i][1][{{1,sz},{},{},{}}]
+            :copy(fcParams[i][1][{{1,sz},{}}]:view(self.fcParams[i][1][{{1,sz},{},{},{}}]:size()))
+          self.fcParams[i][2][{{1,sz}}]
+            :copy(fcParams[i][2][{{1,sz}}]:view(self.fcParams[i][2][{{1,sz}}]:size()))
+        end
+      end
+    end
+  end
+
+  for i = 1, self.nDeconv do
+    local weights = utility.net.fconv2DBilinearWeights(table.unpack(self.deconvConfig[i]))
+    self.deconvParams[i][1]:copy(weights)
+    self.deconvParams[i][2]:fill(0)
+  end
 end

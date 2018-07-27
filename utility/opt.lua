@@ -66,7 +66,10 @@ function opt.parse(arg)
   cmd:option('-vggLayers',      '2 2 3 3 3',             'vgg convolution #layers in each block')
   cmd:option('-vggPad',         1,                       'vgg first convolution pad zero width')
   cmd:option('-vggFc',          '4096 4096',             'vgg fully-connected layers dimension')
+  cmd:option('-vggNoBN',        false,                   'vgg use batch normalization or not')
+  cmd:option('-vggDropout',     false,                   'vgg use dropout or not')
   cmd:option('-vggFuse',        4,                       'fcn vgg fuse level')
+  cmd:option('-vggPost',        false,                   'fcn vgg use pre or post pooling fuse')
   -- unet model options
   cmd:option('-unetPlanes',     '64 128 256 512 1024',   'unet convolution nOutpuPlanes')
   cmd:option('-unetLayers',     '2 2 2 2 2',             'unet convolution #layers in each block')
@@ -83,9 +86,6 @@ function opt.parse(arg)
   option.manualSeed = tonumber(option.manualSeed)
   if option.datasetConfig == '' then
     option.datasetConfig = nil
-  end
-  if option.pretrainPath == '' then
-    option.pretrainPath = nil
   end
 
   torch.setdefaulttensortype('torch.' .. option.tensorType)
@@ -188,13 +188,19 @@ function opt.parse(arg)
 
   if string.find(option.model.network, 'VGG') then
     option.vgg = {planes = option.vggPlanes, layers = option.vggLayers, pad = option.vggPad,
-                  fc = option.vggFc, fuse = option.vggFuse}
+                  fc = option.vggFc, fuse = option.vggFuse, dropout = option.vggDropout, post = option.vggPost}
+    if option.vggNoBN == false then
+      option.vgg.bn = true
+    else
+      option.vgg.bn = false
+    end
   elseif string.find(option.model.network, 'UNet') then
     option.unet = {planes = option.unetPlanes, layers = option.unetLayers, pad = option.unetPad}
   else
     error('network options: VGG | FCNVGG | UNet | FCSLSTMVGG')
   end
   option.vggPlanes, option.vggLayers, option.vggPad, option.vggFc, option.vggFuse = nil, nil, nil, nil, nil
+  option.vggNoBN, option.vggDropout, option.vggPost = nil, nil, nil
   option.unetPlanes, option.unetLayers, option.unetPad = nil, nil, nil
 
   return option
