@@ -461,9 +461,9 @@ function net.outputSize(typename, size, kernel, stride, pad, arg)
   end
 end
 
-function net.outputSize2D(typename, iH, iW, kH, kW, dH, dW, padH, padW, argH, argW)
-  local oH = net.outputSize(typename, iH, kH, dH, padH, argH)
-  local oW = net.outputSize(typename, iW, kW, dW, padW, argW)
+function net.outputSize2D(typename, iH, iW, k, d, pad, arg)
+  local oH = net.outputSize(typename, iH, k, d, pad, arg)
+  local oW = net.outputSize(typename, iW, k, d, pad, arg)
   return oH, oW
 end
 
@@ -489,7 +489,7 @@ function net.conv2DBNReLU(nIn, nOut, k, d, pad, iH, iW)
   m:add(ReLU(true))
   local oH, oW =  nil, nil
   if iH ~= nil and iW ~= nil then
-    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+    oH, oW = net.outputSize2D('conv', iH, iW, k, d, pad)
   end
   return m, oH, oW
 end
@@ -500,7 +500,7 @@ function net.conv2DReLU(nIn, nOut, k, d, pad, iH, iW)
   m:add(ReLU(true))
   local oH, oW =  nil, nil
   if iH ~= nil and iW ~= nil then
-    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+    oH, oW = net.outputSize2D('conv', iH, iW, k, d, pad)
   end
   return m, oH, oW
 end
@@ -513,7 +513,7 @@ function net.conv2DReLUDropout(nIn, nOut, k, d, pad, iH, iW, p)
   m:add(nn.Dropout(p))
   local oH, oW =  nil, nil
   if iH ~= nil and iW ~= nil then
-    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+    oH, oW = net.outputSize2D('conv', iH, iW, k, d, pad)
   end
   return m, oH, oW
 end
@@ -522,7 +522,7 @@ function net.graphConv2DBNReLU(nIn, nOut, k, d, pad, iH, iW, str)
   str = str or ''
   local oH, oW =  nil, nil
   if iH ~= nil and iW ~= nil then
-    oH, oW = net.outputSize2D('conv', iH, iW, k,k, d,d, pad,pad)
+    oH, oW = net.outputSize2D('conv', iH, iW, k, d, pad)
   end
   return function(iNode)
     local conv = Conv2D(nIn, nOut, k,k, d,d, pad,pad)(iNode):annotate({name = 'conv' .. str})
@@ -530,6 +530,13 @@ function net.graphConv2DBNReLU(nIn, nOut, k, d, pad, iH, iW, str)
     local relu = ReLU(true)(bn):annotate({name = 'relu' .. str})
     return relu
   end, oH, oW
+end
+
+function net.linearReLU(nIn, nOut)
+  local m = nn.Sequential()
+  m:add(nn.Linear(nIn, nOut))
+  m:add(ReLU(true))
+  return m
 end
 
 function net.linearBNReLU(nIn, nOut)
@@ -699,22 +706,28 @@ function net.getPretrainVGGParams(path, tensorType)
   return convParams, fcParams
 end
 
-function net.getBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
+function net.fconv2DBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW)
   -- weightSize for deconv: nIn * nOut * kH * kW
-  local oH, oW = net.outputSize2D('fconv', iH, iW, kH, kW, dH, dW, padH, padW)
-  local sH, sW = oH / iH, oW / iW
-  -- assert(kH >= math.floor(sH + 1), 'height kernel < floor(height scale + 1), height kernel can not cover two neighbors')
-  -- assert(kW >= math.floor(sW + 1), 'width kernel < floor(width scale + 1), width kernel can not cover two neighbors')
-  local cH, cW = (kH - 1) / 2 + 1, (kW - 1) / 2 + 1
-  local eH, eW = math.floor(sH * 2) / 2, math.floor(sW * 2) / 2
-  local kHBeg, kWBeg = math.max(1, math.ceil(cH - eH)), math.max(1, math.ceil(cW - eW))
-  local kHEnd, kWEnd = math.min(kH, math.floor(cH + eH)), math.min(kW, math.floor(cW + eW))
+  local sH, sW = math.floor((kH + 1) / 2), math.floor((kW + 1) / 2)
+  local cH, cW
+  if kH % 2 == 1 then
+    cH = sH
+  else
+    cH = sH + 0.5
+  end
+  if kW % 2 == 1 then
+    cW = sW
+  else
+    cW = sW + 0.5
+  end
+  
   local bilinear = torch.zeros(kH, kW)
-  for i = kHBeg, kHEnd do
-    for j = kWBeg, kWEnd do
+  for i = 1, kH do
+    for j = 1, kW do
       bilinear[i][j] = (1 - math.abs((i - cH) / sH)) * (1 - math.abs((j - cW) / sW))
     end
   end
+  
   local weights = torch.Tensor(nIn, nOut, kH, kW)
   for i = 1, nIn do
     for j = 1, nOut do
@@ -723,5 +736,33 @@ function net.getBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
   end
   return weights
 end
+
+-- function net.fconv2DBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW, iH, iW)
+--   -- weightSize for deconv: nIn * nOut * kH * kW
+--   local oH, oW = net.outputSize2D('fconv', iH, iW, kH, kW, dH, dW, padH, padW) -- the api of outputSize2D changed, error
+--   local sH, sW = oH / iH, oW / iW
+--   -- assert(kH >= math.floor(sH + 1), 'height kernel < floor(height scale + 1), height kernel can not cover two neighbors')
+--   -- assert(kW >= math.floor(sW + 1), 'width kernel < floor(width scale + 1), width kernel can not cover two neighbors')
+  
+--   local cH, cW = (kH - 1) / 2 + 1, (kW - 1) / 2 + 1
+--   local eH, eW = math.floor(sH * 2) / 2, math.floor(sW * 2) / 2
+--   local kHBeg, kWBeg = math.max(1, math.ceil(cH - eH)), math.max(1, math.ceil(cW - eW))
+--   local kHEnd, kWEnd = math.min(kH, math.floor(cH + eH)), math.min(kW, math.floor(cW + eW))
+
+--   local bilinear = torch.zeros(kH, kW)
+--   for i = kHBeg, kHEnd do
+--     for j = kWBeg, kWEnd do
+--       bilinear[i][j] = (1 - math.abs((i - cH) / sH)) * (1 - math.abs((j - cW) / sW))
+--     end
+--   end
+
+--   local weights = torch.Tensor(nIn, nOut, kH, kW)
+--   for i = 1, nIn do
+--     for j = 1, nOut do
+--       weights[i][j]:copy(bilinear)
+--     end
+--   end
+--   return weights
+-- end
 
 utility.net = net
