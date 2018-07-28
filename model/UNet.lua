@@ -1,5 +1,5 @@
 
-local UNet = torch.class('model.UNet')
+local UNet = torch.class('modeler.UNet')
 
 require('nngraph')
 

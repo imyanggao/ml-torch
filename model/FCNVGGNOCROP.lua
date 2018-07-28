@@ -1,5 +1,5 @@
 
-local FCNVGGNOCROP, parent = torch.class('model.FCNVGGNOCROP', 'model.VGG')
+local FCNVGGNOCROP, parent = torch.class('modeler.FCNVGGNOCROP', 'modeler.VGG')
 
 require('nngraph')
 

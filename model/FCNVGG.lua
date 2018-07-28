@@ -1,5 +1,5 @@
 
-local FCNVGG, parent = torch.class('model.FCNVGG', 'model.VGG')
+local FCNVGG, parent = torch.class('modeler.FCNVGG', 'modeler.VGG')
 
 function FCNVGG:__init(imgSz, nClass, convPlanes, convLayers, fcDims, pad1, bn, dropout, pretrainPath, fuse, post)
   self:makeConv(imgSz, convPlanes, convLayers, pad1, bn)

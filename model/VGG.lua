@@ -1,5 +1,5 @@
 
-local VGG = torch.class('model.VGG')
+local VGG = torch.class('modeler.VGG')
 
 function VGG:__init(imgSz, nClass, convPlanes, convLayers, fcDims, pad1, bn, dropout, pretrainPath)
   self:makeConv(imgSz, convPlanes, convLayers, pad1, bn)

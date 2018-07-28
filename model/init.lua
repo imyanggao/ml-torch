@@ -1,15 +1,15 @@
 require('nngraph')
 
-model = {}
+modeler = {}
 
-require('model.VGG')
-require('model.GVGG')
-require('model.FCNVGG')
-require('model.FCNVGGNOCROP')
-require('model.FCSLSTMVGG')
-require('model.UNet')
+require('modeler.VGG')
+require('modeler.GVGG')
+require('modeler.FCNVGG')
+require('modeler.FCNVGGNOCROP')
+require('modeler.FCSLSTMVGG')
+require('modeler.UNet')
 
-function model.setup(option)
+function modeler.setup(option)
   local useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
   option.useCuda = useCuda
   print('\n=> Creating model: ' .. option.model.network)
@@ -19,15 +19,15 @@ function model.setup(option)
                        option.vgg.planes, option.vgg.layers, option.vgg.fc, option.vgg.pad,
                        option.vgg.bn, option.vgg.dropout, option.model.pretrainPath}
     if option.model.network == 'VGG' then
-      tNet = model.VGG(table.unpack(paramsTbl))
+      tNet = modeler.VGG(table.unpack(paramsTbl))
     elseif option.model.network == 'FCNVGG' then
-      tNet = model.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
+      tNet = modeler.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
     elseif option.model.network == 'FCSLSTMVGG' then
       table.insert(paramsTbl, option.vgg.fuse)
-      tNet = model.FCSLSTMVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fc, option.vgg.fuse)))
+      tNet = modeler.FCSLSTMVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fc, option.vgg.fuse)))
     end
   elseif string.find(option.model.network, 'UNet') then
-    tNet = model.UNet(option.data.imageSize, option.data.nClass,
+    tNet = modeler.UNet(option.data.imageSize, option.data.nClass,
                       option.unet.planes, option.unet.layers, option.unet.pad, option.model.pretrainPath)
   end
 
@@ -40,7 +40,7 @@ function model.setup(option)
   
   local sNet = utility.checkpoint.load(option)
   if sNet ~= nil then
-    model.copy(sNet:type(network:type()), network)
+    modeler.copy(sNet:type(network:type()), network)
   end
   
   local _, base, _ = utility.io.splitPath(option.log)
@@ -69,9 +69,9 @@ function model.setup(option)
   return network, criterion
 end
 
-function model.copy(s, t)
+function modeler.copy(s, t)
   local sParams, tParams = s:parameters(), t:parameters()
-  assert(#sParams == #tParams, 'model.copy: source and target models do not match!')
+  assert(#sParams == #tParams, 'modeler.copy: source and target models do not match!')
   for i = 1, #tParams do
     tParams[i]:copy(sParams[i])
   end
@@ -82,11 +82,11 @@ function model.copy(s, t)
   for i, m in ipairs(t:findModules(BN2D)) do
     tBN[i] = m
   end
-  assert(#sBN == #tBN, 'model.copy: the batch normalization of source and target models do not match!')
+  assert(#sBN == #tBN, 'modeler.copy: the batch normalization of source and target models do not match!')
   for i = 1, #tBN do
     tBN[i].running_mean:copy(sBN[i].running_mean)
     tBN[i].running_var:copy(sBN[i].running_var)
   end
 end
 
-return model
+return modeler

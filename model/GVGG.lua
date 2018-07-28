@@ -1,5 +1,5 @@
 
-local GVGG = torch.class('model.GVGG')
+local GVGG = torch.class('modeler.GVGG')
 
 require('nngraph')
 

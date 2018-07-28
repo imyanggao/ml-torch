@@ -1,5 +1,5 @@
 
-local FCSLSTMVGG, parent = torch.class('model.FCSLSTMVGG', 'model.FCNVGG')
+local FCSLSTMVGG, parent = torch.class('modeler.FCSLSTMVGG', 'modeler.FCNVGG')
 
 require('nngraph')
 
