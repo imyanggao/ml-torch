@@ -94,8 +94,8 @@ function SemanticSeg:example(set, loader)
     
     if self.option.optim.iEpoch % self.option.example.epoch == 0 then
       self:copyBatch(self.option.example[set].batch)    
-      self.model:forward(self.input)
-      local _, prediction = self.model.output:max(2)
+      self.network:forward(self.input)
+      local _, prediction = self.network.output:max(2)
       prediction = prediction:view(self.option.example[set].n, table.unpack(self.option.example.imageHW)):byte()
       l2i(self.option.example[set].image, prediction, self.option.example[set].r)
       image.save(self.option.example[set].predFile, self.option.example[set].images)

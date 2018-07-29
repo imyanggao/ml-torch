@@ -50,8 +50,8 @@ end
 
 function SeqLSTMCls:statisticsUpdate(set, t)
   parent.statisticsUpdate(self, set, t)
-  self.confusion[set][0]:batchAdd(self.models[t].output[self.nCH+1], self.target[t])
-  self.confusion[set][t]:batchAdd(self.models[t].output[self.nCH+1], self.target[t])
+  self.confusion[set][0]:batchAdd(self.networks[t].output[self.nCH+1], self.target[t])
+  self.confusion[set][t]:batchAdd(self.networks[t].output[self.nCH+1], self.target[t])
 end
 
 -- function SeqLSTMCls:summary(epoch)

@@ -13,11 +13,11 @@ end
 function Sequence:modeFlag(set)
   if set == 'train' then
     for t = 1, self.ntime do
-      self.models[t]:training()
+      self.networks[t]:training()
     end
   elseif set == 'test' then
     for t = 1, self.ntime do
-      self.models[t]:evaluate()
+      self.networks[t]:evaluate()
     end
   end
 end

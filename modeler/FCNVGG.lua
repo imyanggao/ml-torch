@@ -19,7 +19,11 @@ function FCNVGG:makeFC(nClass, fcDims, dropout, pretrainPath)
   self.nFc = 1 + #self.fcDims
   self.fcDims[0] = self.convPlanes[self.nConv]
   self.fcH, self.fcW = {[0] = self.bridgeH[self.nConv]}, {[0] = self.bridgeW[self.nConv]}
-  self.fc, self.fcParams, self.fcGradParams = {}, {}, {}
+  self.fc = {}
+  self.fcParams, self.fcGradParams = {}, {}
+  if self.bn == true then
+    self.fcBNParams, self.fcBNGradParams = {}, {}
+  end
   for i = 1, self.nFc do
     local h, w, nIn, nOut = self.fcH[i-1], self.fcW[i-1], self.fcDims[i-1], self.fcDims[i]
     local kH, kW = convKernel, convKernel
@@ -34,24 +38,25 @@ function FCNVGG:makeFC(nClass, fcDims, dropout, pretrainPath)
     end
     if i == self.nFc then
       nOut = self.nClass
-      self.fc[i] = Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad)
+      self.fc[i] = CUDA(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
       self.fcParams[i], self.fcGradParams[i] = self.fc[i]:parameters()
     else
       if self.dropout == true then
-        self.fc[i] = nn.Sequential()
-          :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
-          :add(ReLU(true))
-          :add(nn.Dropout(0.5))
+        self.fc[i] = CUDA(nn.Sequential()
+                            :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+                            :add(ReLU(true))
+                            :add(nn.Dropout(0.5)))
       else
         if self.bn == true then
-          self.fc[i] = nn.Sequential()
-            :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
-            :add(BN2D(nOut))
-            :add(ReLU(true))
+          self.fc[i] = CUDA(nn.Sequential()
+                              :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+                              :add(BN2D(nOut))
+                              :add(ReLU(true)))
+          self.fcBNParams[i], self.fcBNGradParams[i] = self.fc[i]:get(2):parameters()
         else
-          self.fc[i] = nn.Sequential()
-            :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
-            :add(ReLU(true))
+          self.fc[i] = CUDA(nn.Sequential()
+                              :add(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
+                              :add(ReLU(true)))
         end
       end
       self.fcParams[i], self.fcGradParams[i] = self.fc[i]:get(1):parameters()
@@ -74,7 +79,7 @@ function FCNVGG:makeDeconv(fuse, post)
   -- for post fuse, max fuse lvl is 4; for pre fuse, max fuse lvl could be 5
   local kH, kW, sH, sW = deconvKernel, deconvKernel, deconvStride, deconvStride
   for i = 1, self.fuse do
-    self.deconv[i] = FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad)
+    self.deconv[i] = CUDA(FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad))
     self.deconvConfig[i] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
     self.deconvParams[i], self.deconvGradParams[i] = self.deconv[i]:parameters()
     self.deconvH[i] = utility.net.outputSize('fconv', self.deconvH[i-1], kH, sH, deconvPad)
@@ -87,9 +92,9 @@ function FCNVGG:makeDeconv(fuse, post)
       j = self.nConv - i + 1
       h, w = utility.net.outputSize2D('conv', self.convH[j], self.convW[j], convKernel, convStride, convPad)
     end
-    self.cconv[i] = Conv2D(self.convPlanes[j], self.nClass, convKernel,convKernel, convStride,convStride, convPad,convPad)
+    self.cconv[i] = CUDA(Conv2D(self.convPlanes[j], self.nClass, convKernel,convKernel, convStride,convStride, convPad,convPad))
     -- the usual crop apply to conv
-    self.crop[i] = utility.net.centerCropPad2D(h, w, self.deconvH[i], self.deconvW[i])
+    self.crop[i] = CUDA(utility.net.centerCropPad2D(h, w, self.deconvH[i], self.deconvW[i]))
   end
 
   -- for both pre/post fuse, one more deconv may need to ensure same output as image size
@@ -106,19 +111,19 @@ function FCNVGG:makeDeconv(fuse, post)
     sW = math.ceil((self.convW[0] + 2 * deconvPad) / (self.deconvW[self.fuse] + 1))
     kH = 2 * sH
     kW = 2 * sW
-    self.deconv[self.nDeconv] = FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad)
+    self.deconv[self.nDeconv] = CUDA(FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad))
     self.deconvConfig[self.nDeconv] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
     self.deconvParams[self.nDeconv], self.deconvGradParams[self.nDeconv] = self.deconv[self.nDeconv]:parameters()
     self.deconvH[self.nDeconv] = utility.net.outputSize('fconv', self.deconvH[self.fuse], kH, sH, deconvPad)
     self.deconvW[self.nDeconv] = utility.net.outputSize('fconv', self.deconvW[self.fuse], kW, sW, deconvPad)
     -- the usual crop apply to conv, but the last crop apply to deconv
     self.crop[self.nDeconv] =
-      utility.net.centerCropPad2D(self.deconvH[self.nDeconv], self.deconvW[self.nDeconv], self.convH[0], self.convW[0])
+      CUDA(utility.net.centerCropPad2D(self.deconvH[self.nDeconv], self.deconvW[self.nDeconv], self.convH[0], self.convW[0]))
   end
 end
 
 function FCNVGG:create()
-  local block = {[0] = nn.Identity()()}
+  local block = {[0] = CUDA(nn.Identity())()}
   for i = 1, self.nConv do
     if self.post == true then
       block[i] = self.bridge[i](self.conv[i](block[i-1]))
@@ -146,13 +151,13 @@ function FCNVGG:create()
       j = self.nConv - i + 1
     end
     if i <= self.fuse then
-      block[self.nConv+1+i] = nn.CAddTable()({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))})
+      block[self.nConv+1+i] = CUDA(nn.CAddTable())({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))})
     else
       block[self.nConv+1+i] = self.crop[i](self.deconv[i](block[self.nConv+i]))
     end
   end
-  self.network = nn.gModule({block[0]},
-    {LogSoftMax()(nn.View(-1, self.nClass)(nn.Transpose({2,3}, {3,4})(block[self.nConv+1+self.nDeconv])))})
+  self.network = CUDA(nn.gModule({block[0]},
+                        {LogSoftMax()(nn.View(-1, self.nClass)(nn.Transpose({2,3}, {3,4})(block[self.nConv+1+self.nDeconv])))}))
 end
 
 function FCNVGG:init()
@@ -190,9 +195,9 @@ function FCNVGG:init()
     end
   end
 
-  for i = 1, self.nDeconv do
-    local weights = utility.net.fconv2DBilinearWeights(table.unpack(self.deconvConfig[i]))
-    self.deconvParams[i][1]:copy(weights)
-    self.deconvParams[i][2]:fill(0)
-  end
+  -- for i = 1, self.nDeconv do
+  --   local weights = utility.net.fconv2DBilinearWeights(table.unpack(self.deconvConfig[i]))
+  --   self.deconvParams[i][1]:copy(weights)
+  --   self.deconvParams[i][2]:fill(0)
+  -- end
 end

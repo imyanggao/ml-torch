@@ -1,18 +1,18 @@
 
 require('loader.init')
-require('model.init')
+require('modeler.init')
 require('learner.init')
 
 option = utility.opt.parse(arg)
 
 trainLoader, validLoader = loader.setup(option)
 
-network, criterion = model.setup(option)
+model, criterion = modeler.setup(option)
 
 -- network = torch.load('../pretrain/vgg-16.t7'):cuda()
 -- print(network:parameters())
 
-trainer = learner.setup(network, criterion, option)
+trainer = learner.setup(model, criterion, option)
 
 local optionPath = option.log .. '-option-' .. os.date("%Y_%m_%d_%X")
 utility.tbl.save(optionPath, option)
@@ -36,7 +36,7 @@ for epoch = startEpoch, option.optim.maxEpoch do
       print('>>>>> Best model so far with measure = ' .. measure)
     end
     if epoch % option.checkpointEpoch == 0 or option.optim.bestEpoch == epoch then
-      utility.checkpoint.save(network, option)
+      utility.checkpoint.save(model.network, option)
     end
   end
   collectgarbage()

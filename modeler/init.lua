@@ -11,47 +11,42 @@ require('modeler.UNet')
 
 function modeler.setup(option)
   local useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
-  option.useCuda = useCuda
+  utility.net.cuda(useCuda)
   print('\n=> Creating model: ' .. option.model.network)
-  local tNet
+  local model
   if string.find(option.model.network, 'VGG') then
     local paramsTbl = {option.data.imageSize, option.data.nClass,
                        option.vgg.planes, option.vgg.layers, option.vgg.fc, option.vgg.pad,
                        option.vgg.bn, option.vgg.dropout, option.model.pretrainPath}
     if option.model.network == 'VGG' then
-      tNet = modeler.VGG(table.unpack(paramsTbl))
+      model = modeler.VGG(table.unpack(paramsTbl))
     elseif option.model.network == 'FCNVGG' then
-      tNet = modeler.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
+      model = modeler.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
     elseif option.model.network == 'FCSLSTMVGG' then
       table.insert(paramsTbl, option.vgg.fuse)
-      tNet = modeler.FCSLSTMVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fc, option.vgg.fuse)))
+      model = modeler.FCSLSTMVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fc, option.vgg.fuse)))
     end
   elseif string.find(option.model.network, 'UNet') then
-    tNet = modeler.UNet(option.data.imageSize, option.data.nClass,
-                      option.unet.planes, option.unet.layers, option.unet.pad, option.model.pretrainPath)
+    model = modeler.UNet(option.data.imageSize, option.data.nClass,
+                         option.unet.planes, option.unet.layers, option.unet.pad, option.model.pretrainPath)
   end
 
-  local network = tNet.network
-  local criterion = nn[option.model.criterion](option.data.hist, true, option.data.ignoreIndex)
-  if option.useCuda > 0 then
-    network = network:cuda()
-    criterion = criterion:cuda()
-  end
-  
+  local criterion = CUDA(nn[option.model.criterion](option.data.hist, true, option.data.ignoreIndex))
+
   local sNet = utility.checkpoint.load(option)
   if sNet ~= nil then
-    modeler.copy(sNet:type(network:type()), network)
+    modeler.copy(sNet:type(model.network:type()), model.network)
   end
-  
+
   local _, base, _ = utility.io.splitPath(option.log)
-  graph.dot(network.fg, base, option.log .. '-model-graph')
+  graph.dot(model.network.fg, base, option.log .. '-model-graph')
   nngraph.setDebug(true)
 
   -- use more than one GPU
   if #option.gpu.id > 1 then
     local nccl_found = pcall(require, 'nccl')
     nccl_found = false          -- weird observation: use nccl will slow down the GPU sync at the end of train
-    network = nn.DataParallelTable(1, true, nccl_found):add(network, option.gpu.id)
+    model.network = nn.DataParallelTable(1, true, nccl_found):add(model.network, option.gpu.id)
       :threads(
         function()
           require('nngraph')
@@ -64,9 +59,9 @@ function modeler.setup(option)
           end
         end
               )
-    network.gradInput = nil
+    model.network.gradInput = nil
   end
-  return network, criterion
+  return model, criterion
 end
 
 function modeler.copy(s, t)

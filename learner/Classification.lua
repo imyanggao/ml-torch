@@ -21,6 +21,14 @@ function Classification:iterPrint(set, epoch, iBatch, nBatch, dataTime, iterTime
       :format(epoch, iBatch, nBatch, iterTime, dataTime,
               self.gradParams:norm() / self.params:norm(), self.loss['iter'], acc, iou))
   
+  -- -- test on single gpu
+  -- print(self.model.network:get(2):get(1):get(1).weight[1][1][1][1], self.model.convParams[1][1][1][1][1][1][1])
+  -- print(self.model.network:get(2):get(1):get(1).gradWeight[1][1][1][1], self.model.convGradParams[1][1][1][1][1][1][1])
+
+  -- -- test on nn.DataParallelTable
+  -- print(self.model.network:get(1):get(2):get(1):get(1).weight[1][1][1][1], self.model.convParams[1][1][1][1][1][1][1])
+  -- print(self.model.network:get(1):get(2):get(1):get(1).gradWeight[1][1][1][1], self.model.convGradParams[1][1][1][1][1][1][1])
+  
   -- if set == 'train' then
   --   if epoch == self.option.optim.iEpoch and iBatch == 1 then
   --     local ext = '.txt'
@@ -95,7 +103,7 @@ end
 
 function Classification:statisticsUpdate(set)
   parent.statisticsUpdate(self, set)
-  local output, target = self.model.output, self.target
+  local output, target = self.network.output, self.target
   if self.option.data.ignoreIndex > 0 then -- if exists ignored class
     local validIndices = target:ne(self.option.data.ignoreIndex)
     output = output[validIndices:view(validIndices:nElement(), 1):expandAs(output)]

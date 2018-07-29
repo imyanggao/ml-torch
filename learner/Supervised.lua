@@ -7,9 +7,10 @@ function Supervised:__init(model, criterion, option)
   self.model = model
   self.criterion = criterion
   self.option = option
-  self.params, self.gradParams = utility.net.getParameters(self.model)
+  self.network = self.model.network
+  self.params, self.gradParams = utility.net.getParameters(self.network)
   if self.option.optim.multiLR == true then
-    self.paramsTbl, self.gradParamsTbl = self.model:parameters()
+    self.paramsTbl, self.gradParamsTbl = self.network:parameters()
   else
     self.paramsTbl, self.gradParamsTbl = {self.params}, {self.gradParams}
   end
@@ -19,19 +20,15 @@ function Supervised:__init(model, criterion, option)
   end
   
   -- create data cache type according to model type
-  self.input = torch[self.option.data.inputType]()
-  self.target = torch[self.option.data.targetType]()
-  if self.option.useCuda > 0 then
-    self.input = self.input:cuda()
-    self.target = self.target:cuda()
-  end
+  self.input = CUDA(torch[self.option.data.inputType]())
+  self.target = CUDA(torch[self.option.data.targetType]())
 end
 
 function Supervised:modeFlag(set)
   if set == 'train' then
-    self.model:training()
+    self.network:training()
   elseif set == 'test' then
-    self.model:evaluate()
+    self.network:evaluate()
   end
 end
 
@@ -46,18 +43,18 @@ function Supervised:copyBatch(batchData)
 end
 
 function Supervised:forward(set)
-  self.model:forward(self.input)
-  self.loss['iter'] = self.criterion:forward(self.model.output, self.target)
+  self.network:forward(self.input)
+  self.loss['iter'] = self.criterion:forward(self.network.output, self.target)
   self:statisticsUpdate(set)
 end
 
 function Supervised:backward()
-  self.criterion:backward(self.model.output, self.target)
-  self.model:backward(self.input, self.criterion.gradInput)
+  self.criterion:backward(self.network.output, self.target)
+  self.network:backward(self.input, self.criterion.gradInput)
 end
 
 function Supervised:update()
-  self.model:zeroGradParameters()
+  self.network:zeroGradParameters()
   self:forward('train')
   self:backward()
   local loss = self.loss['iter']
@@ -101,7 +98,7 @@ function Supervised:update()
     optim[self.option.optim.method](propagate, self.paramsTbl[i], self.option.optim.state[i])
   end
 
-  assert(self.params:storage() == self.model:parameters()[1]:storage()) -- double-check getParameters right
+  assert(self.params:storage() == self.network:parameters()[1]:storage()) -- double-check getParameters right
 end
 
 function Supervised:iterPrint(set, epoch, iBatch, nBatch, dataTime, iterTime)
@@ -202,7 +199,7 @@ function Supervised:train(epoch, loader)
      or self.option.example.type == 'all') then
     self:example(set, loader)
   end
-  self.model:clearState()                   -- clear intermediate module to reduce memory cost
+  self.network:clearState()                   -- clear intermediate module to reduce memory cost
 end
 
 function Supervised:test(epoch, loader)
@@ -231,7 +228,7 @@ function Supervised:test(epoch, loader)
   end
 
   self:modeFlag('train')                    -- set default flag to training
-  self.model:clearState()                   -- clear intermediate module to reduce memory cost
+  self.network:clearState()                   -- clear intermediate module to reduce memory cost
   return self:measure()
 end
 

@@ -15,7 +15,7 @@ function SeqLSTM:prepareModel()
     self.CH[t] = {}
     self.gradCH[t] = {}
   end
-  self.models = utility.net.sharedClone(self.model, self.ntime)
+  self.networks = utility.net.sharedClone(self.network, self.ntime)
   self.criterions = utility.net.sharedClone(self.criterion, self.ntime)
   collectgarbage()
 end
@@ -32,7 +32,7 @@ end
 function SeqLSTM:resetState(curEpoch, curBatchSz)
   local function CHCreateZero()
     for i = 1, self.nCH/2 do
-      local zero = torch.zeros(curBatchSz, table.unpack(self.CHSz[i])):typeAs(self.model) -- for GPU
+      local zero = torch.zeros(curBatchSz, table.unpack(self.CHSz[i])):typeAs(self.network) -- for GPU
       self.CH[0][(i-1)*2+1] = zero:clone() -- for cell state
       self.CH[0][(i-1)*2+2] = zero:clone() -- for hidden state
     end
@@ -86,11 +86,11 @@ function SeqLSTM:forward(set)
   for t = 1, self.ntime do
     print(self.CH[t-1])
     print(self.input[t]:size())
-    self.models[t]:forward(utility.tbl.cat(self.CH[t-1], self.input[t]))
+    self.networks[t]:forward(utility.tbl.cat(self.CH[t-1], self.input[t]))
     for i = 1, self.nCH do
-      self.CH[t][i] = self.models[t].output[i]
+      self.CH[t][i] = self.networks[t].output[i]
     end
-    self.loss['iter'][t] = self.criterions[t]:forward(self.models[t].output[self.nCH+1], self.target[t])
+    self.loss['iter'][t] = self.criterions[t]:forward(self.networks[t].output[self.nCH+1], self.target[t])
     self:statisticsUpdate(set, t)
   end
   self.loss['iter'][0] = self.loss['iter'][0] / self.ntime
@@ -98,15 +98,15 @@ end
 
 function SeqLSTM:backward()
   for t = self.ntime, 1, -1 do
-    self.criterions[t]:backward(self.models[t].output[self.nCH+1], self.target[t])
-    self.models[t]:backward(utility.tbl.cat(self.CH[t-1], self.input[t]),
+    self.criterions[t]:backward(self.networks[t].output[self.nCH+1], self.target[t])
+    self.networks[t]:backward(utility.tbl.cat(self.CH[t-1], self.input[t]),
                             utility.tbl.cat(self.gradCH[t], self.criterions[t].gradInput))
     for i = 1, self.nCH do
-      self.gradCH[t-1][i] = self.models[t].gradInput[i]
+      self.gradCH[t-1][i] = self.networks[t].gradInput[i]
     end
     -- clear intermediate module states as output, gradInput, etc. for low gpu memory.
     if t ~= self.ntime then
-      self.models[t]:clearState()
+      self.networks[t]:clearState()
     end
   end
 end

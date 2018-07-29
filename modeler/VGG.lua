@@ -22,11 +22,19 @@ function VGG:makeConv(imgSz, convPlanes, convLayers, pad1, bn)
   self.convPlanes[0] = self.imgSz[1]
   self.convH, self.convW = {[0] = self.imgSz[2]}, {[0] = self.imgSz[3]}
   self.bridgeH, self.bridgeW = {[0] = self.imgSz[2]}, {[0] = self.imgSz[3]}
-  self.conv, self.bridge, self.convParams, self.convGradParams = {}, {}, {}, {}
+  self.conv, self.bridge = {}, {}
+  self.convParams, self.convGradParams = {}, {}
+  if self.bn == true then
+    self.convBNParams, self.convBNGradParams = {}, {}
+  end
 
   for i = 1, self.nConv do
     local h, w, nOut, nIn, p, layer = self.bridgeH[i-1], self.bridgeW[i-1], self.convPlanes[i]
-    self.conv[i], self.convParams[i], self.convGradParams[i] = nn.Sequential(), {}, {}
+    self.conv[i] = CUDA(nn.Sequential())
+    self.convParams[i], self.convGradParams[i] = {}, {}
+    if self.bn == true then
+      self.convBNParams[i], self.convBNGradParams[i] = {}, {}
+    end
     for j = 1, self.convLayers[i] do
       if j == 1 and i == 1 then
         p = self.pad1
@@ -43,11 +51,15 @@ function VGG:makeConv(imgSz, convPlanes, convLayers, pad1, bn)
       else
         layer, h, w = utility.net.conv2DReLU(nIn, nOut, convKernel, convStride, p, h, w)
       end
+      layer = CUDA(layer)      
       self.convParams[i][j], self.convGradParams[i][j] = layer:get(1):parameters()
+      if self.bn == true then
+        self.convBNParams[i][j], self.convBNGradParams[i][j] = layer:get(2):parameters()
+      end
       self.conv[i]:add(layer)
     end
     self.convH[i], self.convW[i] = h, w
-    self.bridge[i] = MaxPool2D(poolKernel, poolKernel, poolStride, poolStride)
+    self.bridge[i] = CUDA(MaxPool2D(poolKernel, poolKernel, poolStride, poolStride))
     self.bridgeH[i], self.bridgeW[i] =
       utility.net.outputSize2D('pool', self.convH[i], self.convW[i], poolKernel, poolStride, poolPad)
   end
@@ -61,19 +73,24 @@ function VGG:makeFC(nClass, fcDims, dropout, pretrainPath)
 
   self.nFc = 1 + #self.fcDims
   self.fcDims[0] = self.convPlanes[self.nConv] * self.bridgeH[self.nConv] * self.bridgeW[self.nConv]
-  self.fc, self.fcParams, self.fcGradParams = {}, {}, {}
+  self.fc = {}
+  self.fcParams, self.fcGradParams = {}, {}
+  if self.bn == true then
+    self.fcBNParams, self.fcBNGradParams = {}, {}
+  end
   for i = 1, self.nFc do
     if i == self.nFc then
-      self.fc[i] = nn.Linear(self.fcDims[i-1], self.nClass)
+      self.fc[i] = CUDA(nn.Linear(self.fcDims[i-1], self.nClass))
       self.fcParams[i], self.fcGradParams[i] = self.fc[i]:parameters()
     else
       if self.dropout == true then
-        self.fc[i] = utility.net.linearReLUDropout(self.fcDims[i-1], self.fcDims[i])
+        self.fc[i] = CUDA(utility.net.linearReLUDropout(self.fcDims[i-1], self.fcDims[i]))
       else
         if self.bn == true then
-          self.fc[i] = utility.net.linearBNReLU(self.fcDims[i-1], self.fcDims[i])
+          self.fc[i] = CUDA(utility.net.linearBNReLU(self.fcDims[i-1], self.fcDims[i]))
+          self.fcBNParams[i], self.fcBNGradParams[i] = self.fc[i]:get(2):parameters()
         else
-          self.fc[i] = utility.net.linearReLU(self.fcDims[i-1], self.fcDims[i])
+          self.fc[i] = CUDA(utility.net.linearReLU(self.fcDims[i-1], self.fcDims[i]))
         end
       end
       self.fcParams[i], self.fcGradParams[i] = self.fc[i]:get(1):parameters()
@@ -82,15 +99,15 @@ function VGG:makeFC(nClass, fcDims, dropout, pretrainPath)
 end
 
 function VGG:create()
-  local block = {[0] = nn.Identity()()}
+  local block = {[0] = CUDA(nn.Identity())()}
   for i = 1, self.nConv do
     block[i] = self.bridge[i](self.conv[i](block[i - 1]))
   end
-  block[self.nConv + 1] = nn.View(-1):setNumInputDims(3)(block[self.nConv])
+  block[self.nConv + 1] = CUDA(nn.View(-1)):setNumInputDims(3)(block[self.nConv])
   for i = 1, self.nFc do
     block[self.nConv + 1 + i] = self.fc[i](block[self.nConv + i])
   end
-  self.network = nn.gModule({block[0]}, {LogSoftMax()(block[self.nConv + 1 + self.nFc])})
+  self.network = CUDA(nn.gModule({block[0]}, {LogSoftMax()(block[self.nConv + 1 + self.nFc])}))
 end
 
 function VGG:init()
