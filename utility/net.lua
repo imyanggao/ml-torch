@@ -99,6 +99,15 @@ function net.gpu(gpuid, minSz, seed)
   end
 end
 
+function net.cuda(useCuda)
+  local cuda = useCuda > 0
+  CUDA = function(model)
+    if cuda then
+      model = model:cuda()
+    end
+    return model
+  end
+end
 
 -- input: any number of nn.gModule and nn.Module
 -- if tbl_net is given, use table.unpack(tbl_net) as input
