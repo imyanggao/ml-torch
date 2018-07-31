@@ -68,7 +68,8 @@ end
 
 function DatasetSegVOC:preprocess(sample, option, split)
   split = split or self.split
-  local input, target, transforms = sample.input, sample.target
+  local input, target, transforms
+  local targetH, targetW = 7, 7
   -- target[target:eq(22)] = 1
   local meanstd
   if string.find(option.model.pretrainPath, 'vgg') then
@@ -80,7 +81,7 @@ function DatasetSegVOC:preprocess(sample, option, split)
   end
   local norm = {mean = torch[self.config.inputType]({0, 0, 0}),
                 std = torch[self.config.inputType]({255, 255, 255})}
-  if self.config.preprocess == 1 then
+  if self.config.preprocess == 1 or self.config.preprocess == 2 then
     if split == 'train' then
       transforms = utility.img2d.transInOrder(
         {
@@ -106,6 +107,10 @@ function DatasetSegVOC:preprocess(sample, option, split)
     error('not supported type of preprocessing')
   end
   
-  return transforms(input, target)
+  input, target = transforms(sample.input, sample.target)
+  if self.config.preprocess == 2 then
+    _, target = utility.img2d.scale(targetH, targetW)(nil, target)
+  end
+  return input, target
 end
 

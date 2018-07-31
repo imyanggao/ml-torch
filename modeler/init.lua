@@ -5,6 +5,7 @@ modeler = {}
 require('modeler.VGG')
 require('modeler.GVGG')
 require('modeler.FCNVGG')
+require('modeler.PreFCNVGG')
 require('modeler.FCNVGGNOCROP')
 require('modeler.FCSLSTMVGG')
 require('modeler.UNet')
@@ -20,6 +21,8 @@ function modeler.setup(option)
                        option.vgg.bn, option.vgg.dropout, option.model.pretrainPath}
     if option.model.network == 'VGG' then
       model = modeler.VGG(table.unpack(paramsTbl))
+    elseif option.model.network == 'PreFCNVGG' then
+      model = modeler.PreFCNVGG(table.unpack(paramsTbl))
     elseif option.model.network == 'FCNVGG' then
       model = modeler.FCNVGG(table.unpack(utility.tbl.cat(paramsTbl, option.vgg.fuse, option.vgg.post)))
     elseif option.model.network == 'FCSLSTMVGG' then
@@ -28,7 +31,8 @@ function modeler.setup(option)
     end
   elseif string.find(option.model.network, 'UNet') then
     model = modeler.UNet(option.data.imageSize, option.data.nClass,
-                         option.unet.planes, option.unet.layers, option.unet.pad, option.model.pretrainPath)
+                         option.unet.planes, option.unet.layers, option.unet.pad,
+                         option.unet.bn, option.model.pretrainPath)
   end
 
   local criterion = CUDA(nn[option.model.criterion](option.data.hist, true, option.data.ignoreIndex))

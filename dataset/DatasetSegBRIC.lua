@@ -131,7 +131,8 @@ end
 function DatasetSegBRIC:preprocess(sample, option, split)
   split = split or self.split
   local height, width, transforms, input, target = 224, 224
-  if self.config.preprocess == 1 then
+  local targetH, targetW = 7, 7
+  if self.config.preprocess == 1 or self.config.preprocess == 2 then
     if split == 'train' then
       transforms = utility.img2d.transInOrder(
         {utility.img2d.cropRandomScale(height, width),
@@ -161,6 +162,9 @@ function DatasetSegBRIC:preprocess(sample, option, split)
     end
   else
     input, target = transforms(sample.input, sample.target)
+    if self.config.preprocess == 2 then
+      _, target = utility.img2d.scale(targetH, targetW)(nil, target)
+    end
   end
   return input, target
 end

@@ -715,6 +715,60 @@ function net.getPretrainVGGParams(path, tensorType)
   return convParams, fcParams
 end
 
+function net.getPreFCNVGGParams(path, tensorType)
+  print(sys.COLORS.green .. 'Loading PreFCNVGG model parameters: ' .. path)
+  local PreFCNVGG = torch.load(path):type(tensorType)
+  local convParams, fcParams, convBNParams, fcBNParams = {{},{},{},{},{}}, {}
+  local nFc = PreFCNVGG:size() - 14 -- 1(Identity) + 10(nConv + nPool) + Transpose + View + LogSoftMax
+  if PreFCNVGG:get(2):get(1):size() == 3 then
+    convBNParams = {{},{},{},{},{}}
+    if nFc - 1 > 0 then
+      fcBNParams = {}
+    end
+  end
+  
+  convParams[1][1] = PreFCNVGG:get(2):get(1):get(1):parameters()
+  convParams[1][2] = PreFCNVGG:get(2):get(2):get(1):parameters()
+  convParams[2][1] = PreFCNVGG:get(4):get(1):get(1):parameters()
+  convParams[2][2] = PreFCNVGG:get(4):get(2):get(1):parameters()
+  convParams[3][1] = PreFCNVGG:get(6):get(1):get(1):parameters()
+  convParams[3][2] = PreFCNVGG:get(6):get(2):get(1):parameters()
+  convParams[3][3] = PreFCNVGG:get(6):get(3):get(1):parameters()
+  convParams[4][1] = PreFCNVGG:get(8):get(1):get(1):parameters()
+  convParams[4][2] = PreFCNVGG:get(8):get(2):get(1):parameters()
+  convParams[4][3] = PreFCNVGG:get(8):get(3):get(1):parameters()
+  convParams[5][1] = PreFCNVGG:get(10):get(1):get(1):parameters()
+  convParams[5][2] = PreFCNVGG:get(10):get(2):get(1):parameters()
+  convParams[5][3] = PreFCNVGG:get(10):get(3):get(1):parameters()
+  for i = 1, nFc do
+    if i < nFc then
+      fcParams[i] = PreFCNVGG:get(11+i):get(1):parameters()
+    else
+      fcParams[i] = PreFCNVGG:get(11+i):parameters()
+    end
+  end
+  if convBNParams ~= nil then
+    convBNParams[1][1] = PreFCNVGG:get(2):get(1):get(2):parameters()
+    convBNParams[1][2] = PreFCNVGG:get(2):get(2):get(2):parameters()
+    convBNParams[2][1] = PreFCNVGG:get(4):get(1):get(2):parameters()
+    convBNParams[2][2] = PreFCNVGG:get(4):get(2):get(2):parameters()
+    convBNParams[3][1] = PreFCNVGG:get(6):get(1):get(2):parameters()
+    convBNParams[3][2] = PreFCNVGG:get(6):get(2):get(2):parameters()
+    convBNParams[3][3] = PreFCNVGG:get(6):get(3):get(2):parameters()
+    convBNParams[4][1] = PreFCNVGG:get(8):get(1):get(2):parameters()
+    convBNParams[4][2] = PreFCNVGG:get(8):get(2):get(2):parameters()
+    convBNParams[4][3] = PreFCNVGG:get(8):get(3):get(2):parameters()
+    convBNParams[5][1] = PreFCNVGG:get(10):get(1):get(2):parameters()
+    convBNParams[5][2] = PreFCNVGG:get(10):get(2):get(2):parameters()
+    convBNParams[5][3] = PreFCNVGG:get(10):get(3):get(2):parameters()
+    for i = 1, nFc-1 do
+      fcBNParams[i] = PreFCNVGG:get(11+i):get(2):parameters()
+    end
+  end
+
+  return convParams, fcParams, convBNParams, fcBNParams
+end
+
 function net.fconv2DBilinearWeights(nIn, nOut, kH, kW, dH, dW, padH, padW)
   -- weightSize for deconv: nIn * nOut * kH * kW
   local sH, sW = math.floor((kH + 1) / 2), math.floor((kW + 1) / 2)

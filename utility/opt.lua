@@ -57,7 +57,7 @@ function opt.parse(arg)
   cmd:option('-dampening',      0,                       'dampening for momentum')
   cmd:option('-nesterov',       false,                   'nesterov for sgd')
   -- model options
-  cmd:option('-network',        'FCNVGG',                'options: VGG | FCNVGG | UNet | FCSLSTMVGG')
+  cmd:option('-network',        'FCNVGG',                'options: VGG | FCNVGG | PreFCNVGG | UNet | FCSLSTMVGG')
   cmd:option('-pretrainPath',   '',                      'pretrain model path')
   cmd:option('-criterion',      'ClassNLLCriterion',     'loss function')
   cmd:option('-unbalance',      false,                   'assign weight to each of the classes in loss function')
@@ -74,6 +74,7 @@ function opt.parse(arg)
   cmd:option('-unetPlanes',     '64 128 256 512 1024',   'unet convolution nOutpuPlanes')
   cmd:option('-unetLayers',     '2 2 2 2 2',             'unet convolution #layers in each block')
   cmd:option('-unetPad',        1,                       'unet first convolution pad zero width')
+  cmd:option('-unetNoBN',       false,                   'unet use batch normalization or not')
 
   cmd:text()
 
@@ -196,6 +197,11 @@ function opt.parse(arg)
     end
   elseif string.find(option.model.network, 'UNet') then
     option.unet = {planes = option.unetPlanes, layers = option.unetLayers, pad = option.unetPad}
+    if option.unetNoBN == false then
+      option.unet.bn = true
+    else
+      option.unet.bn = false
+    end
   else
     error('network options: VGG | FCNVGG | UNet | FCSLSTMVGG')
   end
