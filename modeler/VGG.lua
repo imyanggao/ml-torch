@@ -1,3 +1,4 @@
+require 'hdf5'
 
 local VGG = torch.class('modeler.VGG')
 
@@ -113,7 +114,13 @@ end
 function VGG:init()
   utility.net.init('kaiming', self.network)
   if self.pretrainPath ~= '' then
-    local convParams, fcParams = utility.net.getPretrainVGGParams(self.pretrainPath, self.network:type())
+    local convParams, fcParams, convBNParams, fcBNParams
+    if string.find(option.model.pretrainPath, 'vgg') then
+      convParams, fcParams = utility.net.getPretrainVGGParams(self.pretrainPath, self.network:type())
+    elseif string.find(option.model.pretrainPath, 'PreFCNVGG') then
+      convParams, fcParams, convBNParams, fcBNParams =
+        utility.net.getPreFCNVGGParams(self.pretrainPath, self.network:type())
+    end     
     if #convParams == #self.convParams then
       for i = 1, #convParams do
         if #convParams[i] == #self.convParams[i] then
@@ -121,6 +128,9 @@ function VGG:init()
             if self.convParams[i][j][1]:isSameSizeAs(convParams[i][j][1]) then
               for k = 1, 2 do
                 self.convParams[i][j][k]:copy(convParams[i][j][k])
+                if convBNParams ~= nil and self.convBNParams ~= nil then
+                  self.convBNParams[i][j][k]:copy(convBNParams[i][j][k])
+                end
               end
             else
               print(sys.COLORS.red .. 'conv block ' .. i .. ' layer ' .. j ..
@@ -140,6 +150,11 @@ function VGG:init()
         if self.fcParams[i][1]:isSameSizeAs(fcParams[i][1]) then
           for k = 1, 2 do
             self.fcParams[i][k]:copy(fcParams[i][k])
+            if fcBNParams ~= nil and self.fcBNParams ~= nil then
+              if fcBNParams[i] ~= nil then
+                self.fcBNParams[i][k]:copy(fcBNParams[i][k])
+              end
+            end
           end
         else
           print(sys.COLORS.red .. 'fc layer ' .. i ..
@@ -150,33 +165,39 @@ function VGG:init()
       print(sys.COLORS.red .. '#fc layer in pretrain model does not match')
     end
 
-    return convParams, fcParams
+    return convParams, fcParams, convBNParams, fcBNParams
   end
 end
 
-function VGG:save(paramStr, gradParamStr)
-  if paramStr ~= nil then
+function VGG:save(paramPath)
+  if paramPath ~= nil then
+    local paramFile = hdf5.open(paramPath, 'w')
     for i = 1, self.nConv do
       for j = 1, self.convLayers[i] do
-        torch.save(paramsStr .. '-conv' .. i .. '-' .. j .. '-w.txt', self.convParams[i][j][1])
-        torch.save(paramsStr .. '-conv' .. i .. '-' .. j .. '-b.txt', self.convParams[i][j][2])
+        paramFile:write('conv' .. i .. '-' .. j .. '-w', self.convParams[i][j][1]:float())
+        paramFile:write('conv' .. i .. '-' .. j .. '-b', self.convParams[i][j][2]:float())
+        paramFile:write('conv' .. i .. '-' .. j .. '-dw', self.convGradParams[i][j][1]:float())
+        paramFile:write('conv' .. i .. '-' .. j .. '-db', self.convGradParams[i][j][2]:float())
+        if self.bn == true then
+          paramFile:write('convBN' .. i .. '-' .. j .. '-w', self.convBNParams[i][j][1]:float())
+          paramFile:write('convBN' .. i .. '-' .. j .. '-b', self.convBNParams[i][j][2]:float())
+          paramFile:write('convBN' .. i .. '-' .. j .. '-dw', self.convBNGradParams[i][j][1]:float())
+          paramFile:write('convBN' .. i .. '-' .. j .. '-db', self.convBNGradParams[i][j][2]:float())
+        end
       end
     end
     for i = 1, self.nFc do
-      torch.save(paramsStr .. '-fc' .. i .. '-w.txt', self.fcParams[i][1])
-      torch.save(paramsStr .. '-fc' .. i .. '-b.txt', self.fcParams[i][2])
-    end
-  end
-  if gradParamStr ~= nil then
-    for i = 1, self.nConv do
-      for j = 1, self.convLayers[i] do
-        torch.save(gradParamsStr .. '-conv' .. i .. '-' .. j .. '-dw.txt', self.convGradParams[i][j][1])
-        torch.save(gradParamsStr .. '-conv' .. i .. '-' .. j .. '-db.txt', self.convGradParams[i][j][2])
+      paramFile:write('fc' .. i .. '-w', self.fcParams[i][1]:float())
+      paramFile:write('fc' .. i .. '-b', self.fcParams[i][2]:float())
+      paramFile:write('fc' .. i .. '-dw', self.fcGradParams[i][1]:float())
+      paramFile:write('fc' .. i .. '-db', self.fcGradParams[i][2]:float())
+      if self.bn == true and i < self.nFc then
+        paramFile:write('fcBN' .. i .. '-w', self.fcBNParams[i][1]:float())
+        paramFile:write('fcBN' .. i .. '-b', self.fcBNParams[i][2]:float())
+        paramFile:write('fcBN' .. i .. '-dw', self.fcBNGradParams[i][1]:float())
+        paramFile:write('fcBN' .. i .. '-db', self.fcBNGradParams[i][2]:float())
       end
     end
-    for i = 1, self.nFc do
-      torch.save(gradParamsStr .. '-fc' .. i .. '-dw.txt', self.fcGradParams[i][1])
-      torch.save(gradParamsStr .. '-fc' .. i .. '-db.txt', self.fcGradParams[i][2])
-    end
+    paramFile:close()
   end
 end

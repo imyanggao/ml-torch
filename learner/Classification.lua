@@ -15,11 +15,17 @@ function Classification:confusionUpdate(set)
 end
 
 function Classification:iterPrint(set, epoch, iBatch, nBatch, dataTime, iterTime)
+  parent.iterPrint(self, set, epoch, iBatch, nBatch, dataTime, iterTime)
   local headStr = self:confusionUpdate(set)
   local acc, iou = self.confusion[set].averageValid, self.confusion[set].averageUnionValid
   print((headStr .. '[%d][%d/%d]    Time %.2f  Data %.2f    Grad %6.4f    Loss %6.4f    ACC %6.4f    IOU %6.4f')
       :format(epoch, iBatch, nBatch, iterTime, dataTime,
               self.gradParams:norm() / self.params:norm(), self.loss['iter'], acc, iou))
+  
+  -- if set == 'train' then
+  --   self.model:save('/media/ygao/Seagate Backup Plus Drive/CNN-data/vgg-epoch'
+  --                     .. epoch .. '-iter' .. self.latest['trainIter'] .. '.h5')
+  -- end
   
   -- -- test on single gpu
   -- print(self.model.network:get(2):get(1):get(1).weight[1][1][1][1], self.model.convParams[1][1][1][1][1][1][1])

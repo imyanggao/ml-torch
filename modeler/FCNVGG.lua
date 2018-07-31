@@ -79,8 +79,8 @@ function FCNVGG:makeDeconv(fuse, post)
   -- for post fuse, max fuse lvl is 4; for pre fuse, max fuse lvl could be 5
   local kH, kW, sH, sW = deconvKernel, deconvKernel, deconvStride, deconvStride
   for i = 1, self.fuse do
-    self.deconv[i] = CUDA(FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad))
     self.deconvConfig[i] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
+    self.deconv[i] = CUDA(FConv2D(table.unpack(self.deconvConfig[i])))
     self.deconvParams[i], self.deconvGradParams[i] = self.deconv[i]:parameters()
     self.deconvH[i] = utility.net.outputSize('fconv', self.deconvH[i-1], kH, sH, deconvPad)
     self.deconvW[i] = utility.net.outputSize('fconv', self.deconvW[i-1], kW, sW, deconvPad)
@@ -111,8 +111,8 @@ function FCNVGG:makeDeconv(fuse, post)
     sW = math.ceil((self.convW[0] + 2 * deconvPad) / (self.deconvW[self.fuse] + 1))
     kH = 2 * sH
     kW = 2 * sW
-    self.deconv[self.nDeconv] = CUDA(FConv2D(self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad))
     self.deconvConfig[self.nDeconv] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
+    self.deconv[self.nDeconv] = CUDA(FConv2D(table.unpack(self.deconvConfig[self.nDeconv])))
     self.deconvParams[self.nDeconv], self.deconvGradParams[self.nDeconv] = self.deconv[self.nDeconv]:parameters()
     self.deconvH[self.nDeconv] = utility.net.outputSize('fconv', self.deconvH[self.fuse], kH, sH, deconvPad)
     self.deconvW[self.nDeconv] = utility.net.outputSize('fconv', self.deconvW[self.fuse], kW, sW, deconvPad)
@@ -161,7 +161,7 @@ function FCNVGG:create()
 end
 
 function FCNVGG:init()
-  local convParams, fcParams = parent.init(self)
+  local convParams, fcParams, convBNParams, fcBNParams = parent.init(self)
 
   if fcParams ~= nil then
     if #fcParams ~= #self.fcParams then
@@ -172,6 +172,11 @@ function FCNVGG:init()
         print(sys.COLORS.green .. 'fc layer ' .. i .. ' #parameter in pretrain model does match, so reshape and copy')
         for k = 1, 2 do
           self.fcParams[i][k]:copy(fcParams[i][k]:view(self.fcParams[i][k]:size()))
+          if fcBNParams ~= nil and self.fcBNParams ~= nil then
+            if fcBNParams[i] ~= nil then
+              self.fcBNParams[i][k]:copy(fcBNParams[i][k])
+            end
+          end
         end
       else
         print(sys.COLORS.red .. 'fc layer ' .. i .. ' #parameter in pretrain model does not match')
