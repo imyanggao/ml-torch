@@ -66,6 +66,8 @@ function Supervised:update()
   if self.option.lrFinder == true then
     self.option.optim.state[1].learningRate = self.option.optim.lrMin *
       math.exp(-self.lrFinderStep * (self.latest['trainIter'] - 1))
+    self.lrFinderRecord[1][self.latest['trainIter']] = self.option.optim.state[1].learningRate
+    self.lrFinderRecord[2][self.latest['trainIter']] = self.loss['iter']
   else
     if self.option.optim.regime == nil then
       self.option.optim.state[1].learningRate = self.lrScheduler(self.latest['trainIter'])
@@ -136,10 +138,6 @@ end
 
 function Supervised:statisticsUpdate(set)
   self.loss[set] = self.loss[set] + self.loss['iter'] * self.latest['batchSz']
-  if self.option.lrFinder == true then
-    self.lrFinderRecord[1][self.latest['trainIter']] = self.option.optim.state[1].learningRate
-    self.lrFinderRecord[2][self.latest['trainIter']] = self.loss['iter']
-  end
 end
 
 -- function Supervised:summary(epoch)
