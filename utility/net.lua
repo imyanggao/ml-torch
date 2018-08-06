@@ -219,26 +219,49 @@ function net.init(arg, ...)
 
   -- "Efficient backprop"
   -- Yann Lecun, 1998
-  local function init_heuristic(fan_in, fan_out)
-    return math.sqrt(1/(3*fan_in))
+  local function std_heuristic(fanIn, fanOut)
+    return math.sqrt(1 / (3 * fanIn))
   end
   
   -- "Understanding the difficulty of training deep feedforward neural networks"
   -- Xavier Glorot, 2010
-  local function init_xavier(fan_in, fan_out)
-    return math.sqrt(2/(fan_in + fan_out))
+  local function std_xavier(fanIn, fanOut)
+    return math.sqrt(2 / (fanIn + fanOut))
   end
 
   -- "Understanding the difficulty of training deep feedforward neural networks"
   -- Xavier Glorot, 2010
-  local function init_xavier_caffe(fan_in, fan_out)
-    return math.sqrt(1/fan_in)
+  local function std_xavier_caffe(fanIn, fanOut)
+    return math.sqrt(1 / fanIn)
   end
 
   -- "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification"
   -- Kaiming He, 2015
-  local function init_kaiming(fan_in, fan_out)
-    return math.sqrt(4/(fan_in + fan_out))
+  local function std_kaiming(fanIn, fanOut)
+    return math.sqrt(2 / fanOut)
+  end
+
+  local function fan(nnmodule)
+    local typename = torch.type(nnmodule)
+    local fanIn, fanOut = nil, nil
+    if typename == 'nn.Linear'
+      or typename == 'nn.LinearNoBias'
+      or typename == 'nn.LookupTable'
+      or typename:find('TemporalConvolution')
+    then
+      fanIn, fanOut = nnmodule.weight:size(2), nnmodule.weight:size(1)
+    elseif typename:find('SpatialConvolution')
+      or typename:find('SpatialFullConvolution')
+    then
+      fanIn = nnmodule.nInputPlane * nnmodule.kW * nnmodule.kH
+      fanOut = nnmodule.nOutputPlane * nnmodule.kW * nnmodule.kH
+    elseif typename:find('VolumetricConvolution')
+      or typename:find('VolumetricFullConvolution')
+    then
+      fanIn = nnmodule.nInputPlane * nnmodule.kT * nnmodule.kW * nnmodule.kH
+      fanOut = nnmodule.nOutputPlane * nnmodule.kT * nnmodule.kW * nnmodule.kH
+    end
+    return fanIn, fanOut
   end
 
   local function set(m, method)
