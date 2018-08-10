@@ -53,13 +53,14 @@ end
 -- with the largest free gpu memory as the "main" gpu.
 -- An optional RNG seed could be specified to allow reproduce random sequence.  
 function net.gpu(gpuid, minSz, seed)
+  local useCuda = -1
   if #gpuid == 0 or (#gpuid == 1 and gpuid[1] <= 0) then
     -- no check on CPU memory usage, so minSz don't need to be specified
     if seed ~= nil then
       torch.manualSeed(seed)
     end
     net.declare('nn')
-    return 0
+    useCuda = 0
   else
     local cunn_found, cudnn_found = pcall(require, 'cunn'), pcall(require, 'cudnn')
     assert(cunn_found == true, 'package cunn not found!')
@@ -91,12 +92,14 @@ function net.gpu(gpuid, minSz, seed)
     end
     if cudnn_found == true then
       net.declare('cudnn')
-      return 2
+      useCuda = 2
     else
       net.declare('cunn')
-      return 1
+      useCuda = 1
     end
   end
+  net.cuda(useCuda)
+  return useCuda
 end
 
 function net.cuda(useCuda)

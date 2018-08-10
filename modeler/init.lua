@@ -12,7 +12,6 @@ require('modeler.UNet')
 
 function modeler.setup(option)
   local useCuda = utility.net.gpu(option.gpu.id, option.gpu.ram, option.gpu.manualSeed)
-  utility.net.cuda(useCuda)
   print('\n=> Creating model: ' .. option.model.network)
   local model
   if string.find(option.model.network, 'VGG') then
