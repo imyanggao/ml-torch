@@ -210,37 +210,15 @@ function net.getParameters(...)
   return flatParameters, flatGradParameters
 end
 
-
--- arg: 'heuristic', 'xavier', 'xavier_caffe', 'kaiming'
--- input (...): any number of nn.gModule and nn.Module
+-- nnmodule: nn.gModule or nn.Module
+-- wb: 'weight', 'bias'
+-- op: 'zero', 'fill', 'copy', 'uniform', 'normal'
+-- arg: 'heuristic', 'xavier', 'xavierIn', 'xavierOut', 'kaiming'
+--      nil (zero), any number (fill), same size tensor (copy)
+--      min, max (uniform), mean, std (normal)
 -- initialization affect inside function, get the return is not necessary
-function net.init(arg, ...)
-  local networks = {...}
-
-  -- "Efficient backprop"
-  -- Yann Lecun, 1998
-  local function std_heuristic(fanIn, fanOut)
-    return math.sqrt(1 / (3 * fanIn))
-  end
+function net.init(nnmodule, wb, op, ...)
   
-  -- "Understanding the difficulty of training deep feedforward neural networks"
-  -- Xavier Glorot, 2010
-  local function std_xavier(fanIn, fanOut)
-    return math.sqrt(2 / (fanIn + fanOut))
-  end
-
-  -- "Understanding the difficulty of training deep feedforward neural networks"
-  -- Xavier Glorot, 2010
-  local function std_xavier_caffe(fanIn, fanOut)
-    return math.sqrt(1 / fanIn)
-  end
-
-  -- "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification"
-  -- Kaiming He, 2015
-  local function std_kaiming(fanIn, fanOut)
-    return math.sqrt(2 / fanOut)
-  end
-
   local function fan(nnmodule)
     local typename = torch.type(nnmodule)
     local fanIn, fanOut = nil, nil
@@ -260,60 +238,110 @@ function net.init(arg, ...)
     then
       fanIn = nnmodule.nInputPlane * nnmodule.kT * nnmodule.kW * nnmodule.kH
       fanOut = nnmodule.nOutputPlane * nnmodule.kT * nnmodule.kW * nnmodule.kH
+    else
+      error('can not find fanIn, fanOut')
     end
     return fanIn, fanOut
   end
 
-  local function set(m, method)
-    if m.__typename == 'nn.SpatialConvolution' then
-      m:reset(method(m.nInputPlane*m.kH*m.kW, m.nOutputPlane*m.kH*m.kW))
-    elseif m.__typename == 'nn.SpatialConvolutionMM' then
-      m:reset(method(m.nInputPlane*m.kH*m.kW, m.nOutputPlane*m.kH*m.kW))
-    elseif m.__typename == 'cudnn.SpatialConvolution' then
-      m:reset(method(m.nInputPlane*m.kH*m.kW, m.nOutputPlane*m.kH*m.kW))
-    elseif m.__typename == 'nn.LateralConvolution' then
-      m:reset(method(m.nInputPlane*1*1, m.nOutputPlane*1*1))
-    elseif m.__typename == 'nn.VerticalConvolution' then
-      m:reset(method(1*m.kH*m.kW, 1*m.kH*m.kW))
-    elseif m.__typename == 'nn.HorizontalConvolution' then
-      m:reset(method(1*m.kH*m.kW, 1*m.kH*m.kW))
-    elseif m.__typename == 'nn.Linear' then
-      m:reset(method(m.weight:size(2), m.weight:size(1)))
-    elseif m.__typename == 'nn.TemporalConvolution' then
-      m:reset(method(m.weight:size(2), m.weight:size(1)))            
-    end
-    
-    if m.bias then
-      m.bias:zero()
-    end
-  end
-
-  -- choose initialization method
-  local method = nil
-  if     arg == 'heuristic'    then method = init_heuristic
-  elseif arg == 'xavier'       then method = init_xavier
-  elseif arg == 'xavier_caffe' then method = init_xavier_caffe
-  elseif arg == 'kaiming'      then method = init_kaiming
-  else
-    assert(false)
-  end
-
-  local nnmodule = nil
-  for i = 1, #networks do
-    if #networks[i]:listModules() == 1 then
-      nnmodule = networks[i]
-      set(nnmodule, method)
-    elseif #networks[i]:listModules() > 1 then
-      for j = 1, #networks[i].modules do
-        nnmodule = networks[i].modules[j]
-        set(nnmodule, method)
-      end
-    else
-      assert(false)
-    end
+  -- "Efficient backprop"
+  -- Yann Lecun, 1998
+  local function stdHeuristic(fanIn, fanOut)
+    return math.sqrt(1 / (3 * fanIn))
   end
   
-  return table.unpack(networks)
+  -- "Understanding the difficulty of training deep feedforward neural networks"
+  -- Xavier Glorot, 2010
+  local function stdXavier(fanIn, fanOut)
+    return math.sqrt(2 / (fanIn + fanOut))
+  end
+
+  -- "Understanding the difficulty of training deep feedforward neural networks"
+  -- Xavier Glorot, 2010
+  local function stdXavierIn(fanIn, fanOut)
+    return math.sqrt(1 / fanIn)
+  end
+
+  -- same as xavier_caffe, but using fanOut, same logic as kaiming
+  local function stdXavierOut(fanIn, fanOut)
+    return math.sqrt(1 / fanOut)
+  end
+
+  -- "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification"
+  -- Kaiming He, 2015
+  local function stdKaiming(fanIn, fanOut)
+    return math.sqrt(2 / fanOut)
+  end
+  
+  local arg = {...}
+  assert(wb == 'weight' or wb == 'bias', 'wb options: weight, bias')
+  assert(nnmodule[wb] ~= nil, 'module does not have ' .. wb .. ' member')
+  assert(op == 'zero' or op == 'fill' or op == 'copy' or
+           op == 'uniform' or op == 'normal',
+         'op options: zero, fill, copy, uniform, normal')
+  if #arg == 0 then
+    if op == 'zero' then
+      nnmodule[wb][op](nnmodule[wb])
+    else
+      error('#arg == 0, but op ~= zero')
+    end
+  elseif #arg == 1 then
+    if op == 'fill' then
+      if torch.type(arg[1]) == 'number' then
+        nnmodule[wb][op](nnmodule[wb], arg[1])
+      else
+        error('#arg == 1 and op == fill, but type(arg[1]) ~= number')
+      end
+    elseif op == 'copy' then
+      if string.find(torch.type(arg[1]), 'Tensor') then
+        if nnmodule[wb]:isSameSizeAs(arg[1]) then
+          nnmodule[wb][op](nnmodule[wb], arg[1])
+        else
+          error('#arg == 1 and op == copy, but size(arg[1]) ~= size(wb)')
+        end
+      else
+        error('#arg == 1 and op == copy, but type(arg[1]) ~= Tensor')
+      end
+    elseif op == 'uniform' or op == 'normal' then
+      if torch.type(arg[1]) == 'string' then
+        assert(arg[1] == 'heuristic' or arg[1] == 'xavier' or
+                 arg[1] == 'xavierIn' or arg[1] == 'xavierOut' or
+                 arg[1] == 'kaiming',
+               'arg options: heuristic, xavier, xavierIn, xavierOut, kaiming')
+        local fanIn, fanOut = fan(nnmodule)
+        -- choose initialization method
+        local std = nil
+        if     arg[1] == 'heuristic'    then std = stdHeuristic(fanIn, fanOut)
+        elseif arg[1] == 'xavier'       then std = stdXavier(fanIn, fanOut)
+        elseif arg[1] == 'xavierIn'     then std = stdXavierIn(fanIn, fanOut)
+        elseif arg[1] == 'xavierOut'    then std = stdXavierOut(fanIn, fanOut)
+        elseif arg[1] == 'kaiming'      then std = stdKaiming(fanIn, fanOut)
+        end
+        if op == 'uniform' then
+          nnmodule[wb][op](nnmodule[wb], -std, std)
+        elseif op == 'normal' then
+          nnmodule[wb][op](nnmodule[wb], 0, std)
+        end
+      else
+        error('#arg == 1 and op == ' .. op .. ', but type(arg[1]) ~= string')
+      end
+    else
+      error('#arg == 1, but op == zero')
+    end
+  elseif #arg == 2 then
+    if torch.type(arg[1]) == 'number' and torch.type(arg[2]) == 'number' then
+      if op == 'uniform' or op == 'normal' then
+        nnmodule[wb][op](nnmodule[wb], arg[1], arg[2])
+      else
+        error('#arg == 2, but op ~= uniform and op ~= normal')
+      end
+    else
+      error('#arg == 2, but type(arg[1]) ~= number or type(arg[2]) ~= number')
+    end
+  else
+    error('max two args support')
+  end
+  
 end
 
 function net.lrSchemes(optim)
