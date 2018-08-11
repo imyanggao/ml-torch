@@ -30,14 +30,17 @@ function FCNVGG:makeFC(nClass, fcDims, dropout, pretrainPath)
     if i == 1 then
       if string.find(self.pretrainPath, 'vgg') then
         kH, kW = pretrainKernel, pretrainKernel
-      -- else
-      --   -- general way to transfer 1st fc layer to conv layer
-      --   -- we don't want to use this to reduce image size to 1*1 in further if don't have a pretrained model
-      --   kH, kW = self.fcH[0], self.fcW[0]
+      else
+        if self.nFc > 1 then
+          -- general way to transfer 1st fc layer to conv layer
+          -- we don't want to use this to reduce image size to 1*1 in further if don't have a pretrained model
+          kH, kW = self.fcH[0], self.fcW[0]
+        end
       end
     end
     if i == self.nFc then
-      nOut = self.nClass
+      nOut = self.nClass        -- for summation fuse
+      -- nOut = self.nClass * 2    -- for concatenation fuse
       self.fc[i] = CUDA(Conv2D(nIn, nOut, kH,kW, convStride,convStride, convPad,convPad))
       self.fcParams[i], self.fcGradParams[i] = self.fc[i]:parameters()
     else
@@ -78,12 +81,15 @@ function FCNVGG:makeDeconv(fuse, post)
   
   -- for post fuse, max fuse lvl is 4; for pre fuse, max fuse lvl could be 5
   local kH, kW, sH, sW = deconvKernel, deconvKernel, deconvStride, deconvStride
+  local nIn = self.nClass       -- for summation fuse
+  -- local nIn = self.nClass * 2   -- for concatenation fuse
   for i = 1, self.fuse do
-    self.deconvConfig[i] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
-    self.deconv[i] = CUDA(FConv2D(table.unpack(self.deconvConfig[i])))
-    self.deconvParams[i], self.deconvGradParams[i] = self.deconv[i]:parameters()
+    self.deconvConfig[i] = {nIn, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
     self.deconvH[i] = utility.net.outputSize('fconv', self.deconvH[i-1], kH, sH, deconvPad)
     self.deconvW[i] = utility.net.outputSize('fconv', self.deconvW[i-1], kW, sW, deconvPad)
+    self.deconv[i] = CUDA(FConv2D(table.unpack(self.deconvConfig[i]))) -- for deconv
+    -- self.deconv[i] = CUDA(nn.SpatialUpSamplingBilinear({oheight = self.deconvH[i], owidth = self.deconvW[i]})) -- for bilinear to replace deconv
+    self.deconvParams[i], self.deconvGradParams[i] = self.deconv[i]:parameters()
     local j, h, w
     if self.post == true then
       j = self.nConv - i
@@ -94,7 +100,8 @@ function FCNVGG:makeDeconv(fuse, post)
     end
     self.cconv[i] = CUDA(Conv2D(self.convPlanes[j], self.nClass, convKernel,convKernel, convStride,convStride, convPad,convPad))
     -- the usual crop apply to conv
-    self.crop[i] = CUDA(utility.net.centerCropPad2D(h, w, self.deconvH[i], self.deconvW[i]))
+    self.crop[i] = CUDA(utility.net.centerCropPad2D(h, w, self.deconvH[i], self.deconvW[i])) -- for crop
+    -- self.crop[i] = CUDA(nn.SpatialUpSamplingBilinear({oheight = self.deconvH[i], owidth = self.deconvW[i]})) -- for bilinear to replace crop
   end
 
   -- for both pre/post fuse, one more deconv may need to ensure same output as image size
@@ -106,19 +113,22 @@ function FCNVGG:makeDeconv(fuse, post)
     self.nDeconv = self.fuse
   else
     self.nDeconv = self.fuse + 1
-    -- with constraint k = 2*s, s > (size+2p) / (in+1)
-    sH = math.ceil((self.convH[0] + 2 * deconvPad) / (self.deconvH[self.fuse] + 1))
-    sW = math.ceil((self.convW[0] + 2 * deconvPad) / (self.deconvW[self.fuse] + 1))
-    kH = 2 * sH
-    kW = 2 * sW
-    self.deconvConfig[self.nDeconv] = {self.nClass, self.nClass, kH,kW, sH,sW, deconvPad,deconvPad}
-    self.deconv[self.nDeconv] = CUDA(FConv2D(table.unpack(self.deconvConfig[self.nDeconv])))
+    -- with constraint k = 4*p and s = 2*p, p > size / (2*in)
+    pH = math.ceil(self.convH[0] / (2 * self.deconvH[self.fuse]))
+    pW = math.ceil(self.convW[0] / (2 * self.deconvW[self.fuse]))
+    sH = 2 * pH
+    sW = 2 * pW
+    kH = 4 * pH
+    kW = 4 * pW
+    self.deconvConfig[self.nDeconv] = {nIn, self.nClass, kH,kW, sH,sW, pH,pW}
+    self.deconvH[self.nDeconv] = utility.net.outputSize('fconv', self.deconvH[self.fuse], kH, sH, pH)
+    self.deconvW[self.nDeconv] = utility.net.outputSize('fconv', self.deconvW[self.fuse], kW, sW, pW)
+    self.deconv[self.nDeconv] = CUDA(FConv2D(table.unpack(self.deconvConfig[self.nDeconv]))) -- for deconv
+    -- self.deconv[self.nDeconv] = CUDA(nn.SpatialUpSamplingBilinear({oheight = self.deconvH[self.nDeconv], owidth = self.deconvW[self.nDeconv]})) -- for bilinear to replace deconv
     self.deconvParams[self.nDeconv], self.deconvGradParams[self.nDeconv] = self.deconv[self.nDeconv]:parameters()
-    self.deconvH[self.nDeconv] = utility.net.outputSize('fconv', self.deconvH[self.fuse], kH, sH, deconvPad)
-    self.deconvW[self.nDeconv] = utility.net.outputSize('fconv', self.deconvW[self.fuse], kW, sW, deconvPad)
     -- the usual crop apply to conv, but the last crop apply to deconv
-    self.crop[self.nDeconv] =
-      CUDA(utility.net.centerCropPad2D(self.deconvH[self.nDeconv], self.deconvW[self.nDeconv], self.convH[0], self.convW[0]))
+    self.crop[self.nDeconv] = CUDA(utility.net.centerCropPad2D(self.deconvH[self.nDeconv], self.deconvW[self.nDeconv], self.convH[0], self.convW[0])) -- for crop
+    -- self.crop[self.nDeconv] = CUDA(nn.SpatialUpSamplingBilinear({oheight = self.convH[0], owidth = self.convW[0]})) -- for bilinear to replace crop
   end
 end
 
@@ -151,7 +161,8 @@ function FCNVGG:create()
       j = self.nConv - i + 1
     end
     if i <= self.fuse then
-      block[self.nConv+1+i] = CUDA(nn.CAddTable())({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))})
+      block[self.nConv+1+i] = CUDA(nn.CAddTable())({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))}) -- for summation fuse
+      -- block[self.nConv+1+i] = CUDA(nn.JoinTable(1,3))({self.deconv[i](block[self.nConv+i]), self.crop[i](self.cconv[i](block[j]))}) -- for concatenation fuse
     else
       block[self.nConv+1+i] = self.crop[i](self.deconv[i](block[self.nConv+i]))
     end
